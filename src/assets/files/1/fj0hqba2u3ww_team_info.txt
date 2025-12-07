@@ -1,0 +1,9 @@
+Team Roles Information
+
+-   Fikri: Product Manager of the team and also plays the role of Cyber
+    Security Engineer.
+-   Waleed: Backend Engineer.
+-   Rana: Backend Engineer.
+-   Ahmed Elgamal: Backend Engineer.
+-   Khdar: AI Engineer.
+-   Zahran: AI Engineer.

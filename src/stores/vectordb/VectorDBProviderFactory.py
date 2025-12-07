@@ -3,24 +3,17 @@ from .VectorDBEnums import VectorDBEnums
 from controllers.BaseController import BaseController
 
 class VectorDBProviderFactory:
-    
-    def __init__(self,config):
-        self.config=config
-        self.base_controller=BaseController()
+    def __init__(self, config):
+        self.config = config
+        self.base_controller = BaseController()
 
-    def create(self,provider:str):
-        if provider==VectorDBEnums.QDRANT.value:
-            db_path=self.base_controller.get_database_path(db_name=self.config.VECTOR_DB_PATH)
+    def create(self, provider: str):
+        if provider == VectorDBEnums.QDRANT.value:
+            db_path = self.base_controller.get_database_path(db_name=self.config.VECTOR_DB_PATH)
+
             return QdrantDBProvider(
                 db_path=db_path,
-                distance_method=self.config.VECTOR_DB_DISTANCE_METHOD
+                distance_method=self.config.VECTOR_DB_DISTANCE_METHOD,
             )
         
-        elif provider==VectorDBEnums.PINECONE.value:
-            return PineconeDBProvider(self.config)
-        elif provider==VectorDBEnums.FAISS.value:
-            return FaissDBProvider(self.config)
-        else:
-            raise ValueError(f"Unknown provider: {provider}")
-
-    
+        return None
