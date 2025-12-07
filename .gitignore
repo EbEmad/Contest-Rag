@@ -209,3 +209,5 @@ __marimo__/
 
 file.txt
 .vscode
+DocumentAssistantv.py
+.python.env
