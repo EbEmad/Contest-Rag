@@ -2,9 +2,9 @@ from fastapi import FastAPI
 from routes import base, data, nlp
 from motor.motor_asyncio import AsyncIOMotorClient
 from helpers.config import get_settings
-from stores.llm.LLMProviderFactory import LLMProviderFactory
-from stores.vectordb.VectorDBProviderFactory import VectorDBProviderFactory
-from stores.llm.templates.template_parser import TemplateParser
+from AI.llm.LLMProviderFactory import LLMProviderFactory
+from AI.vectordb.VectorDBProviderFactory import VectorDBProviderFactory
+from AI.llm.templates.template_parser import TemplateParser
 
 app = FastAPI()
 
