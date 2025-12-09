@@ -1,6 +1,6 @@
 from .BaseController import BaseController
 from models.db_schemes import Project, DataChunk
-from stores.llm.LLMEnums import DocumentTypeEnum
+from AI.llm.LLMEnums import DocumentTypeEnum
 from typing import List
 import json
 

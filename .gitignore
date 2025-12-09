@@ -211,6 +211,6 @@ file.txt
 .vscode
 DocumentAssistantv.py
 .python.env
-/src/assets/databases/
-/src/assets/file/
+/src/assets/database/
+/src/assets/files/
 

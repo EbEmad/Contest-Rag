@@ -82,7 +82,7 @@ class GeminiProvider(LLMInterface):
                 task_type = self.enums.QUERY.value
 
             config=EmbedContentConfig(task_type=task_type,output_dimensionality=self.embedding_size)
-            results = await self.client.aio.models.embed_content(
+            results =  self.client.aio.models.embed_content(
                 model=self.embedding_model_id,
                 contents=text,
                 config=config
