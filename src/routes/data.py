@@ -25,9 +25,10 @@ async def upload_data(request: Request, project_id: str, file: UploadFile,
                       app_settings: Settings = Depends(get_settings)):
         
     
-    project_model = await ProjectModel.create_instance(
-        db_client=request.app.db_client
-    )
+    # project_model = await ProjectModel.create_instance(
+    #     db_client=request.app.db_client
+    # )
+    project_model=request.app.project_model
 
     project = await project_model.get_project_or_create_one(
         project_id=project_id
@@ -95,9 +96,10 @@ async def process_endpoint(request: Request, project_id: str, process_request: P
     overlap_size = process_request.overlap_size
     do_reset = process_request.do_reset
 
-    project_model = await ProjectModel.create_instance(
-        db_client=request.app.db_client
-    )
+    # project_model = await ProjectModel.create_instance(
+    #     db_client=request.app.db_client
+    # )
+    project_model=request.app.project_model
 
     project = await project_model.get_project_or_create_one(
         project_id=project_id
@@ -152,9 +154,10 @@ async def process_endpoint(request: Request, project_id: str, process_request: P
     no_records = 0
     no_files = 0
 
-    chunk_model = await ChunkModel.create_instance(
-                        db_client=request.app.db_client
-                    )
+    # chunk_model = await ChunkModel.create_instance(
+    #                     db_client=request.app.db_client
+    #                 )
+    chunk_model=request.app.chunk_model
 
     if do_reset == 1:
         _ = await chunk_model.delete_chunks_by_project_id(
