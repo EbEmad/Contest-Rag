@@ -69,9 +69,11 @@ async def upload_data(request: Request, project_id: str, file: UploadFile,
         )
 
     # store the assets into the database
-    asset_model = await AssetModel.create_instance(
-        db_client=request.app.db_client
-    )
+    # asset_model = await AssetModel.create_instance(
+    #     db_client=request.app.db_client
+    # )
+
+    asset_model=request.app.asset_model
 
     asset_resource = Asset(
         asset_project_id=project.id,
@@ -105,9 +107,10 @@ async def process_endpoint(request: Request, project_id: str, process_request: P
         project_id=project_id
     )
 
-    asset_model = await AssetModel.create_instance(
-            db_client=request.app.db_client
-        )
+    # asset_model = await AssetModel.create_instance(
+    #         db_client=request.app.db_client
+    #     )
+    asset_model=request.app.asset_model
 
     project_files_ids = {}
     if process_request.file_id:

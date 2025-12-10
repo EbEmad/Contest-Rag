@@ -7,6 +7,7 @@ from AI.vectordb.VectorDBProviderFactory import VectorDBProviderFactory
 from AI.llm.templates.template_parser import TemplateParser
 from models.ProjectModel import ProjectModel
 from models.ChunkModel import ChunkModel
+from models.AssetModel import AssetModel
 app = FastAPI()
 
 async def startup_span():
@@ -22,6 +23,9 @@ async def startup_span():
 
     # create chunk model instance
     app.chunk_model=await ChunkModel.create_instance(db_client=app.db_client)
+    
+    # create asset model instance
+    app.asset_model= await AssetModel.create_instance(db_client=app.db_client)
 
     # generation client
     app.generation_client = llm_provider_factory.create(provider=settings.GENERATION_BACKEND)
