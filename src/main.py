@@ -5,6 +5,7 @@ from helpers.config import get_settings
 from AI.llm.LLMProviderFactory import LLMProviderFactory
 from AI.vectordb.VectorDBProviderFactory import VectorDBProviderFactory
 from AI.llm.templates.template_parser import TemplateParser
+from controllers import NLPController
 from models.ProjectModel import ProjectModel
 from models.ChunkModel import ChunkModel
 from models.AssetModel import AssetModel
@@ -45,6 +46,14 @@ async def startup_span():
     app.template_parser = TemplateParser(
         language=settings.PRIMARY_LANG,
         default_language=settings.DEFAULT_LANG,
+    )
+
+    # create nlp controller
+    nlp_controller=NLPController(
+        vectordb_client=app.vectordb_client,
+        generation_client=app.generation_client,
+        embedding_client=app.embedding_client,
+        template_parser=app.template_parser,
     )
 
 
