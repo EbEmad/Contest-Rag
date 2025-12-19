@@ -137,6 +137,8 @@ class QdrantDBProvider(VectorDBInterface):
         if not results or len(results) == 0:
             return None
         
+        # return results
+        
         return [
             RetrievedDocument(**{
                 "score": result.score,
