@@ -49,7 +49,7 @@ async def startup_span():
     )
 
     # create nlp controller
-    nlp_controller=NLPController(
+    app.nlp_controller=NLPController(
         vectordb_client=app.vectordb_client,
         generation_client=app.generation_client,
         embedding_client=app.embedding_client,
