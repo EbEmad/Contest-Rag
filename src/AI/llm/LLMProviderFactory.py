@@ -27,9 +27,10 @@ class LLMProviderFactory:
         if provider == LLMEnums.GEMINI.value:
             return GeminiProvider(
                 api_key=self.config.GEMINI_API_KEY,
-                default_max_input_characters=self.config.DEFAULT_MAX_INPUT_CHARACTERS,
-                default_max_output_tokens=self.config.DEFAULT_MAX_TOKENS,
-                default_temperature=self.config.DEFAULT_TEMPERATURE
+                api_url=self.config.GEMINI_API_URL,
+                default_input_max_characters=self.config.INPUT_DAFAULT_MAX_CHARACTERS,
+                default_generation_max_output_tokens=self.config.GENERATION_DAFAULT_MAX_TOKENS,
+                default_generation_temperature=self.config.GENERATION_DAFAULT_TEMPERATURE
             )
 
 
