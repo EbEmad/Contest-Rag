@@ -57,7 +57,7 @@ async def index_project(request: Request, project_id: str, push_request: PushReq
         chunks_ids =  list(range(idx, idx + len(page_chunks)))
         idx += len(page_chunks)
         
-        is_inserted = nlp_controller.index_into_vector_db(
+        is_inserted = await nlp_controller.index_into_vector_db(
             project=project,
             chunks=page_chunks,
             do_reset=push_request.do_reset,
@@ -126,7 +126,7 @@ async def search_index(request: Request, project_id: str, search_request: Search
 
     nlp_controller = request.app.nlp_controller
 
-    results = nlp_controller.search_vector_db_collection(
+    results = await nlp_controller.search_vector_db_collection(
         project=project, text=search_request.text, limit=search_request.limit
     )
 
@@ -161,7 +161,7 @@ async def answer_rag(request: Request, project_id: str, search_request: SearchRe
     #     template_parser=request.app.template_parser,
     # )
     nlp_controller = request.app.nlp_controller
-    answer, full_prompt, chat_history = nlp_controller.answer_rag_question(
+    answer, full_prompt, chat_history = await nlp_controller.answer_rag_question(
         project=project,
         query=search_request.text,
         limit=search_request.limit,
