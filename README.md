@@ -23,6 +23,28 @@ graph LR
     class B,C db
 ```
 
+## How It Works
+
+Here is a short and simple explanation of each part of the project:
+
+### 1. The Web Server (FastAPI)
+Think of this as the front desk. It receives your requests (like "upload this file" or "answer this question") and directs them to the right department.
+
+### 2. The Database (MongoDB)
+This is the filing cabinet. It stores your uploaded files and keeps track of all the small text pieces (chunks) we make from them.
+
+### 3. The Vector Store (Qdrant)
+This is the smart index. It doesn't just store words; it stores the *meaning* of the text as numbers (vectors). This allows the system to find relevant information even if the exact keywords don't match.
+
+### 4. The Brains (LLM)
+This is the intelligent part (like OpenAI or Gemini). It reads the relevant information found by Qdrant and writes a clear answer to your question.
+
+### 5. The Workflow
+1.  **Ingestion**: You upload a PDF. We chop it into small pieces (chunks) and save them to MongoDB.
+2.  **Indexing**: We turn those chunks into "vectors" (meaning-numbers) and save them in Qdrant.
+3.  **Search**: You ask a question. We turn your question into a vector and find the most similar chunks in Qdrant.
+4.  **Answer**: We give those chunks to the LLM and say "Answer this question using these notes."
+
 ## Tech Stack
 
 -   **Backend Framework**: [FastAPI](https://fastapi.tiangolo.com/) - High-performance async web framework.
