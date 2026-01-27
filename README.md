@@ -60,3 +60,62 @@ graph LR
 
 4.  **Access the API**:
     Navigate to `http://localhost:8000/docs` to view the interactive API documentation.
+
+## API Usage
+
+Here are the essential `curl` commands to interact with the API.
+
+### 1. Check Health
+```bash
+curl -X GET "http://localhost:8000/api/v1/"
+```
+
+### 2. Upload Document
+Upload a PDF file to the system.
+```bash
+curl -X POST "http://localhost:8000/api/v1/data/upload/my_project" \
+     -H "Content-Type: multipart/form-data" \
+     -F "file=@/path/to/your/document.pdf"
+```
+
+### 3. Process Document
+Chunk the uploaded document.
+```bash
+curl -X POST "http://localhost:8000/api/v1/data/process/my_project" \
+     -H "Content-Type: application/json" \
+     -d '{
+           "chunk_size": 100,
+           "overlap_size": 20,
+           "do_reset": 0
+         }'
+```
+
+### 4. Index Data
+Push processed chunks to Qdrant vector store.
+```bash
+curl -X POST "http://localhost:8000/api/v1/nlp/index/push/my_project" \
+     -H "Content-Type: application/json" \
+     -d '{"do_reset": 0}'
+```
+
+### 5. Search Index
+Semantic search for relevant context.
+```bash
+curl -X POST "http://localhost:8000/api/v1/nlp/index/search/my_project" \
+     -H "Content-Type: application/json" \
+     -d '{
+           "text": "What is the summary of the document?",
+           "limit": 5
+         }'
+```
+
+### 6. RAG Answer
+Ask a question and get an AI-generated answer.
+```bash
+curl -X POST "http://localhost:8000/api/v1/nlp/index/answer/my_project" \
+     -H "Content-Type: application/json" \
+     -d '{
+           "text": "Explain the key findings.",
+           "limit": 5
+         }'
+```
