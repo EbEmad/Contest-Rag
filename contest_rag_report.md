@@ -14,6 +14,10 @@ graph TD
     User((User/Frontend)) -->|Upload Documents| API[FastAPI Backend]
     API -->|Process & Chunk| PC[Process Controller]
     PC -->|Generate Embeddings| EC[Embedding Client]
+    
+    EC <-->|Cache Embeddings| RD[(Redis Cache)]
+    API <-->|Cache Answers| RD
+
     EC -->|Store Vectors| VDB[(Qdrant Vector DB)]
     PC -->|Store Metadata| MDB[(MongoDB)]
     
@@ -62,11 +66,31 @@ Generated prompts are structured to force model "grounding":
 ### 3.4 Storage Strategy
 - **Qdrant (Vector DB)**: Stores high-dimensional embeddings for fast semantic lookup.
 - **MongoDB (Metadata DB)**: Manages project state, document tracking, and raw chunk persistence using the asynchronous **Motor** driver.
+- **Redis (Caching Layer)**: Provides high-speed caching for search results, query embeddings, and frequent LLM responses to optimize performance and reduce latency.
 
 ### 3.5 Provider Factory Pattern
 To ensure the system is model-agnostic, we implemented a **Factory Pattern** for AI services:
 - **LLMProviderFactory**: Dynamically instantiates clients for OpenAI, Gemini, or Cohere.
 - **VectorDBProviderFactory**: Abstracts the vector database, allowing for seamless switching between Qdrant, Pinecone, or other providers.
 
-## 4. Conclusion
+## 5. System Evaluation: Real-World Test Case
+To demonstrate the system's effectiveness, we conducted a retrieval test using a project containing team member information.
+
+### 5.1 Test Data
+**Source File**: `test.txt`
+**Content Snippet**:
+> "Ebrahim Emad is our AI and Data Engineer, leading the charge in designing intelligent systems..."
+> "Ahmed Zaharan is an AI Engineer, focused on developing advanced machine learning models..."
+
+### 5.2 Retrieval Scenario
+| Query | Expected Answer Context | Actual System Response |
+| :--- | :--- | :--- |
+| "Who is Ebrahim Emad?" | AI and Data Engineer | Ebrahim Emad is the AI and Data Engineer who leads the design of intelligent systems and data pipeline management. |
+| "What is Ahmed Zaharan's role?" | AI Engineer | Ahmed Zaharan is an AI Engineer focused on developing advanced machine learning models to solve complex problems. |
+| "What does Waleed Alaa do?" | Backend Engineer | Waleed Alaa is the Backend Engineer, responsible for ensuring systems are fast, reliable, and scalable. |
+
+### 5.3 Observation
+The system successfully retrieved the correct chunks from `test.txt`, performed accurate reranking via the Cross-Encoder, and generated concise, grounded answers without hallucinations.
+
+## 6. Conclusion
 The Contest-RAG system represents a sophisticated implementation of generative AI grounded in local data. By integrating semantic chunking, cross-encoder reranking, and a modular provider architecture, the system provides a robust framework for building reliable and transparent AI-driven document assistants.
