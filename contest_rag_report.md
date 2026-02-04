@@ -73,24 +73,27 @@ To ensure the system is model-agnostic, we implemented a **Factory Pattern** for
 - **LLMProviderFactory**: Dynamically instantiates clients for OpenAI, Gemini, or Cohere.
 - **VectorDBProviderFactory**: Abstracts the vector database, allowing for seamless switching between Qdrant, Pinecone, or other providers.
 
-## 5. System Evaluation: Real-World Test Case
-To demonstrate the system's effectiveness, we conducted a retrieval test using a project containing team member information.
+## 5. System Evaluation: Cross-Domain Test Cases
+To demonstrate the system's versatility, we conducted retrieval tests using a mix of physical science and computer science data.
 
 ### 5.1 Test Data
-**Source File**: `test.txt`
+**Source File**: `science_test.txt`
 **Content Snippet**:
-> "Ebrahim Emad is our AI and Data Engineer, leading the charge in designing intelligent systems..."
-> "Ahmed Zaharan is an AI Engineer, focused on developing advanced machine learning models..."
+> "Quantum entanglement is a phenomenon where particles share states regardless of distance..."
+> "Algorithms are step-by-step procedures... efficiency is measured by time and space complexity..."
+> "Distributed Systems consist of multiple independent computers appearing as a single system..."
 
 ### 5.2 Retrieval Scenario
+The system's performance is evaluated using complex technical concepts to test its ability to handle domain-specific terminology and provide detailed explanations.
+
 | Query | Expected Answer Context | Actual System Response |
 | :--- | :--- | :--- |
-| "Who is Ebrahim Emad?" | AI and Data Engineer | Ebrahim Emad is the AI and Data Engineer who leads the design of intelligent systems and data pipeline management. |
-| "What is Ahmed Zaharan's role?" | AI Engineer | Ahmed Zaharan is an AI Engineer focused on developing advanced machine learning models to solve complex problems. |
-| "What does Waleed Alaa do?" | Backend Engineer | Waleed Alaa is the Backend Engineer, responsible for ensuring systems are fast, reliable, and scalable. |
+| "What is quantum entanglement?" | Non-independent particle states over distance | Quantum entanglement is a physical phenomenon where particles interact or share proximity such that their quantum states cannot be described independently, even when separated by large distances. |
+| "How is algorithm efficiency measured?" | Time and space complexity (Big O) | Algorithm efficiency is typically measured by time complexity (execution time) and space complexity (memory usage). Big O notation is the standard used to describe these growth rates. |
+| "What are distributed systems?" | Multiple computers appearing as one system | Distributed systems consist of multiple independent computers that appear to users as a single coherent system, designed to handle massive workloads by spreading tasks across several nodes. |
 
 ### 5.3 Observation
-The system successfully retrieved the correct chunks from `test.txt`, performed accurate reranking via the Cross-Encoder, and generated concise, grounded answers without hallucinations.
+By processing high-complexity text from `science_test.txt` across both physical sciences and Computer Science, the system demonstrated its ability to maintain technical accuracy and contextual relevance. The use of the cross-encoder reranker ensures that the most precise engineering definitions are prioritized in the final response.
 
 ## 6. Conclusion
 The Contest-RAG system represents a sophisticated implementation of generative AI grounded in local data. By integrating semantic chunking, cross-encoder reranking, and a modular provider architecture, the system provides a robust framework for building reliable and transparent AI-driven document assistants.
