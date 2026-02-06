@@ -6,24 +6,39 @@
 *   **Headline**: A Unified Educational Infrastructure
 *   **Visual**:
 ```mermaid
-graph TD
-    System[AI Contest Platform]
-    Teacher[Teacher]
-    Student[Student]
-    Parent[Parent]
+flowchart TB
+    %% Class Definitions
+    classDef platform fill:#6b46c1,stroke:#4c1d95,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef actor fill:#1a1a1a,stroke:#6b46c1,stroke-width:1.5px,color:#fff;
 
-    Teacher -->|Uploads Materials / Sets Contests| System
-    System -->|Intelligent Tutor / Practice Tests| Student
-    Student -->|Competes / Learns| System
-    System -->|Performance Analytics| Teacher
-    System -->|Progress Reports| Parent
-    Parent -->|Monitors / Supports| Student
+    %% Nodes
+    System["<b>🧠 LEGAMII AI Brain</b><br/>(Contest Platform)"]:::platform
+    
+    subgraph Stakeholders
+        direction LR
+        Teacher["<b>👨‍🏫 Teacher</b>"]:::actor
+        Student["<b>👨 Student</b>"]:::actor
+        Parent["<b>👪 Parent</b>"]:::actor
+    end
+
+    %% Interactions
+    Teacher -->|"Materials & Contests"| System
+    System -->|"Analytics & Insights"| Teacher
+
+    System -->|"AI Tutoring & Tests"| Student
+    Student -->|"Learning & Competition"| System
+
+    System -.->|"Progress Reports"| Parent
+    Parent -.->|"Student Support"| Student
+
+    %% Styling
+    style Stakeholders fill:none,stroke:#6b46c1,stroke-dasharray: 5 5
 ```
 *   **Key Point**: Every stakeholder is connected through a single source of truth (the educational data).
 
 ---
 
-## Slide 3: The Role of AI for Students
+## Slide 2: The Role of AI for Students
 *   **Headline**: Empowering the Learner's Journey
 *   **Points**:
     *   **Intelligent Explanations**: Teaching complex concepts using specific teacher-provided materials (Context-Aware).
@@ -94,8 +109,11 @@ graph TD
 ### 1. Flexibility via Design Patterns
 The system uses the **Factory Pattern** to remain model-agnostic, allowing for seamless switching between different AI providers (OpenAI, Gemini, etc.) without changing the core business logic.
 
-> [!TIP]
+
 > **Implementation Note**: See `LLMProviderFactory.py` where providers are dynamically instantiated based on configuration.
+
+> **Implementation Note**: See `VectorDBProviderFactory.py` for dynamic instantiation of vector database providers (e.g., Qdrant).
+
 
 ### 2. High Concurrency
 The system leverages Python's modern **Asynchronous I/O** capabilities to handle multiple requests and heavy AI processing simultaneously without blocking.
@@ -109,4 +127,5 @@ Scalability is addressed through distributed storage and aggressive caching laye
 *   **Distributed Storage**: 
     *   **Qdrant**: A dedicated high-performance vector database for billion-scale similarity searches.
     *   **MongoDB**: Flexible metadata storage that scales without rigid schema constraints.
+
 
