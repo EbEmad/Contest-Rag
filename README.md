@@ -64,6 +64,41 @@ This is the intelligent part (like OpenAI or Gemini). It reads the relevant info
 -   **Context-Aware QA**: Ask questions about your documents and receive answers grounded in the uploaded content.
 -   **Hybrid Storage**: Combines MongoDB for document management with Qdrant for vector search.
 
+## AI Roles in the System
+
+This platform leverages AI to empower all stakeholders in the educational ecosystem:
+
+### 1. For Students: The Intelligent Learning Companion
+*   **Context-Aware Explanations**: Provides detailed explanations based specifically on the materials provided by the teacher, ensuring accuracy and relevance.
+*   **Smart Question Banks**: Automatically generates quizzes and practice questions indexed by historical exam patterns to help students prepare effectively.
+*   **Performance Analytics**: Measures the student's level and tracks contest performance to identify specific gaps.
+*   **Personalized Future Plans**: Generates a tailored roadmap to address weak points and improve overall learning outcomes.
+
+### 2. For Teachers & Schools: Proactive Educational Management
+*   **Student Progress Monitoring**: Offers high-level insights into student performance trends across different subjects.
+*   **Problem Identification**: Pinpoints specific areas where multiple students are struggling, suggesting potential curriculum adjustments or focused review sessions.
+*   **Curriculum Alignment**: Ensures that the AI-generated content remains strictly within the bounds of the provided educational resources.
+
+### 3. For Parents: Transparent Progress Tracking
+*   **Automated Reporting**: Generates periodic reports detailing the child's strengths, weaknesses, and improvement over time.
+*   **Guided Support**: Helps parents understand exactly what their child needs to work on, making home-based support more effective.
+
+---
+
+## Why this Platform? (vs. ChatGPT/NotebookLM)
+
+While general tools like ChatGPT or specialized ones like NotebookLM are powerful, this platform offers a tailored ecosystem for institutional learning:
+
+| Feature | Contest-Rag Platform | General LLMs (ChatGPT) | NotebookLM |
+| :--- | :--- | :--- | :--- |
+| **Data Privacy** | Full control over source documents | Data may be used for training | Limited to Google ecosystem |
+| **Contest Integration** | Built-in contest platform & ranking | None | None |
+| **Stakeholder Reports** | Custom reports for parents/teachers | None | Personal use only |
+| **Structured Analytics** | In-depth weak point analysis | Chat-based only | Document-based only |
+| **Learning Roadmap** | AI-generated plans based on history | Generic advice | None |
+
+This platform is not just a chatbot; it's a comprehensive **Educational Management System** powered by RAG technology.
+
 ## Getting Started
 
 1.  **Clone the repository**:

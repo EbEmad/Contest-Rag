@@ -6,10 +6,18 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "aiofiles==23.2.1",
+    "billiard==4.2.1",
+    "celery==5.5.3",
     "cohere==5.5.8",
     "fastapi==0.110.2",
+    "flower==2.0.1",
     "google-genai>=1.53.0",
+    "kombu==5.5.4",
     "langchain==0.1.20",
+    "langchain-community>=0.0.38",
+    "langchain-experimental>=0.0.58",
+    "langchain-openai>=0.1.7",
+    "langchain-text-splitters>=0.0.2",
     "motor==3.6.0",
     "openai==1.75.0",
     "pydantic-mongo==2.3.0",
@@ -18,5 +26,8 @@ dependencies = [
     "python-dotenv==1.0.1",
     "python-multipart==0.0.9",
     "qdrant-client==1.10.1",
+    "redis==6.2.0",
+    "sentence-transformers>=5.2.2",
     "uvicorn[standard]==0.29.0",
+    "vine==5.1.0",
 ]
