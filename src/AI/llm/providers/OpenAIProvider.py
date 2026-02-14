@@ -1,7 +1,8 @@
 from ..LLMInterface import LLMInterface
 from ..LLMEnums import OpenAIEnums
-from openai import OpenAI
+from openai import AsyncOpenAI
 import logging
+from typing import List
 
 class OpenAIProvider(LLMInterface):
 
@@ -25,7 +26,7 @@ class OpenAIProvider(LLMInterface):
         if self.api_url and not self.api_url.endswith("/v1"):
              self.api_url += "/v1"
 
-        self.client = OpenAI(
+        self.client = AsyncOpenAI(
             api_key = self.api_key,
             base_url = self.api_url if self.api_url and len(self.api_url) else None
         )
@@ -61,7 +62,7 @@ class OpenAIProvider(LLMInterface):
            await self.construct_prompt(prompt=prompt, role=OpenAIEnums.USER.value)
         )
 
-        response = self.client.chat.completions.create(
+        response = await self.client.chat.completions.create(
             model = self.generation_model_id,
             messages = chat_history,
             max_tokens = max_output_tokens or self.default_generation_max_output_tokens,
@@ -85,9 +86,10 @@ class OpenAIProvider(LLMInterface):
             self.logger.error("Embedding model for OpenAI was not set")
             return None
         
-        response = self.client.embeddings.create(
+        processed_text = await self.process_text(text)
+        response = await self.client.embeddings.create(
             model = self.embedding_model_id,
-            input = text,
+            input = processed_text,
         )
 
         if not response or not response.data or len(response.data) == 0 or not response.data[0].embedding:
@@ -95,6 +97,62 @@ class OpenAIProvider(LLMInterface):
             return None
 
         return response.data[0].embedding
+
+    async def embed_texts_batch(self, texts: List[str], document_type: str = None, batch_size: int = 100) -> List[List[float]]:
+        if not self.client or not self.embedding_model_id:
+            self.logger.error("OpenAI client or embedding model not set")
+            return []
+
+        all_embeddings = []
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i:i + batch_size]
+            processed_batch = [await self.process_text(text) for text in batch]
+            try:
+                response = await self.client.embeddings.create(
+                    model=self.embedding_model_id,
+                    input=processed_batch,
+                )
+                if response and response.data:
+                    # Maintain order as returned by OpenAI (matches input index/order)
+                    sorted_data = sorted(response.data, key=lambda x: x.index)
+                    all_embeddings.extend([item.embedding for item in sorted_data])
+                else:
+                    self.logger.error("OpenAI batch embedding returned empty result")
+                    return []
+            except Exception as e:
+                self.logger.error(f"OpenAI batch embedding error: {e}")
+                return []
+
+        return all_embeddings
+
+    async def generate_text_stream(self, prompt: str, chat_history: list = [], max_output_tokens: int = None,
+                                   temperature: float = None):
+        if not self.client:
+            self.logger.error("OpenAI client was not set")
+            return
+
+        if not self.generation_model_id:
+            self.logger.error("Generation model for OpenAI was not set")
+            return
+
+        max_output_tokens = max_output_tokens if max_output_tokens else self.default_generation_max_output_tokens
+        temperature = temperature if temperature else self.default_generation_temperature
+
+        chat_history.append(
+            await self.construct_prompt(prompt=prompt, role=OpenAIEnums.USER.value)
+        )
+
+        response = await self.client.chat.completions.create(
+            model=self.generation_model_id,
+            messages=chat_history,
+            max_tokens=max_output_tokens,
+            temperature=temperature,
+            stream=True
+        )
+
+        async for chunk in response:
+            if chunk.choices and chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
 
     async def construct_prompt(self, prompt: str, role: str):
         return {

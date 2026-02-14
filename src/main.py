@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from routes import base, data, nlp
 from motor.motor_asyncio import AsyncIOMotorClient
 from helpers.config import get_settings
+from helpers.cache import CacheManager
 from AI.llm.LLMProviderFactory import LLMProviderFactory
 from AI.vectordb.VectorDBProviderFactory import VectorDBProviderFactory
 from AI.llm.templates.template_parser import TemplateParser
@@ -15,6 +16,12 @@ async def startup_span():
     settings = get_settings()
     app.mongo_conn = AsyncIOMotorClient(settings.MONGODB_URL)
     app.db_client = app.mongo_conn[settings.MONGODB_DATABASE]
+
+    # Redis cache manager (connect on startup)
+    app.cache_manager = CacheManager(
+        redis_url=settings.REDIS_URL,
+        ttl=getattr(settings, "CACHE_TTL", 3600),
+    )
 
     llm_provider_factory = LLMProviderFactory(settings)
     vectordb_provider_factory = VectorDBProviderFactory(settings)
@@ -55,6 +62,8 @@ async def startup_span():
         embedding_client=app.embedding_client,
         template_parser=app.template_parser,
     )
+    # attach cache to NLP controller if available
+    app.nlp_controller.cache = app.cache_manager
 
 
 async def shutdown_span():

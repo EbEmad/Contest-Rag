@@ -7,7 +7,7 @@ class Settings(BaseSettings):
 
     FILE_ALLOWED_TYPES: list
     FILE_MAX_SIZE: int
-    FILE_DEFAULT_CHUNK_SIZE: int
+    FILE_DEFAULT_CHUNK_SIZE: int=1000
 
     MONGODB_URL: str
     MONGODB_DATABASE: str
@@ -30,10 +30,24 @@ class Settings(BaseSettings):
 
     VECTOR_DB_BACKEND : str
     VECTOR_DB_PATH : str
+    VECTOR_DB_URL : str = None
     VECTOR_DB_DISTANCE_METHOD: str = None
 
     PRIMARY_LANG: str = "en"
     DEFAULT_LANG: str = "en"
+    REDIS_URL: str = "redis://localhost:6379"
+    CACHE_TTL: int = 3600  # 1 hour
+
+    # Celery Configuration
+    CELERY_BROKER_URL: str = None
+    CELERY_RESULT_BACKEND: str = None
+    CELERY_TASK_SERIALIZER: str = "json"
+    CELERY_RESULT_SERIALIZER: str = "json"
+    CELERY_TASK_TIME_LIMIT: int = 600
+    CELERY_TASK_ACKS_LATE: bool = True
+    CELERY_WORKER_CONCURRENCY: int = 2
+    CELERY_FLOWER_PASSWORD: str = None
+    
 
     class Config:
         env_file = ".env"

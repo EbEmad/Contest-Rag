@@ -5,6 +5,7 @@ from models.ProjectModel import ProjectModel
 from models.ChunkModel import ChunkModel
 from controllers import NLPController
 from models import ResponseSignal
+from tasks.data_indexing import index_data_content
 
 import logging
 
@@ -18,66 +19,14 @@ nlp_router = APIRouter(
 @nlp_router.post("/index/push/{project_id}")
 async def index_project(request: Request, project_id: str, push_request: PushRequest):
 
-    project_model = request.app.project_model
-
-    chunk_model = request.app.chunk_model
-    project = await project_model.get_project_or_create_one(
-        project_id=project_id
+    task=index_data_content.delay(
+        project_id=project_id,
+        do_reset=push_request.do_reset
     )
-
-    if not project:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={
-                "signal": ResponseSignal.PROJECT_NOT_FOUND_ERROR.value
-            }
-        )
-    
-    # nlp_controller = NLPController(
-    #     vectordb_client=request.app.vectordb_client,
-    #     generation_client=request.app.generation_client,
-    #     embedding_client=request.app.embedding_client,
-    #     template_parser=request.app.template_parser,
-    # )
-    nlp_controller = request.app.nlp_controller
-    has_records = True
-    page_no = 1
-    inserted_items_count = 0
-    idx = 0
-
-    while has_records:
-        page_chunks = await chunk_model.get_poject_chunks(project_id=project.id, page_no=page_no)
-        if len(page_chunks):
-            page_no += 1
-        
-        if not page_chunks or len(page_chunks) == 0:
-            has_records = False
-            break
-
-        chunks_ids =  list(range(idx, idx + len(page_chunks)))
-        idx += len(page_chunks)
-        
-        is_inserted = await nlp_controller.index_into_vector_db(
-            project=project,
-            chunks=page_chunks,
-            do_reset=push_request.do_reset,
-            chunks_ids=chunks_ids
-        )
-
-        if not is_inserted:
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content={
-                    "signal": ResponseSignal.INSERT_INTO_VECTORDB_ERROR.value
-                }
-            )
-        
-        inserted_items_count += len(page_chunks)
-        
     return JSONResponse(
         content={
-            "signal": ResponseSignal.INSERT_INTO_VECTORDB_SUCCESS.value,
-            "inserted_items_count": inserted_items_count
+            "signal":ResponseSignal.DATA_PUSH_TASK_READY.value,
+            "task_id":task.id
         }
     )
 
@@ -179,7 +128,27 @@ async def answer_rag(request: Request, project_id: str, search_request: SearchRe
         content={
             "signal": ResponseSignal.RAG_ANSWER_SUCCESS.value,
             "answer": answer,
-            "full_prompt": full_prompt,
-            "chat_history": chat_history
+            #"full_prompt": full_prompt,
+            #"chat_history": chat_history
         }
     )
+@nlp_router.post("/index/answer_stream/{project_id}")
+async def answer_rag_stream(request: Request, project_id: str, search_request: SearchRequest):
+    from fastapi.responses import StreamingResponse
+    
+    project_model = request.app.project_model
+    project = await project_model.get_project_or_create_one(project_id=project_id)
+    
+    nlp_controller = request.app.nlp_controller
+
+    async def event_generator():
+        async for chunk in nlp_controller.answer_rag_question_stream(
+            project=project,
+            query=search_request.text,
+            limit=search_request.limit,
+        ):
+            if await request.is_disconnected():
+                break
+            yield f"data: {chunk}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
