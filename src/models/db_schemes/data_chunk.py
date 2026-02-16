@@ -10,6 +10,10 @@ class DataChunk(BaseModel):
     chunk_project_id: ObjectId
     chunk_asset_id: ObjectId
 
+    topic_id: Optional[ObjectId] = None
+    chapter_id: Optional[ObjectId] = None
+    subject_id: Optional[ObjectId] = None
+
     class Config:
         arbitrary_types_allowed = True
 

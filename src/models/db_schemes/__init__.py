@@ -5,3 +5,4 @@ from .celery_task_execution import CeleryTaskExecution
 from .curriculum import Subject, Chapter, Topic
 from .quiz import Question, QuizAttempt, QuestionType, DifficultyLevel
 from .performance import TopicPerformance, LearningRoadmap
+from .student import StudentProfile

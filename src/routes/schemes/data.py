@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 
 class ProcessRequest(BaseModel):
     file_id: str = None
@@ -10,3 +10,5 @@ class ProcessRequest(BaseModel):
     # Optional curriculum metadata
     grade: Optional[int] = None
     subject: Optional[str] = None
+    chapter_name: Optional[str] = None  # NEW: Chapter name
+    topic_names: Optional[List[str]] = None  # NEW: List of topic names this book covers
