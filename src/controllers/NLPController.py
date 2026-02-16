@@ -154,7 +154,7 @@ class NLPController(BaseController):
         
         return [doc for doc, score in scored_docs[:top_k]]
     
-    async def answer_rag_question(self, project: Project, query: str, limit: int = 10):
+    async def answer_rag_question(self, project: Project, query: str, limit: int = 10, grade: int = None, subject: str = None):
         # Check cache first
         if hasattr(self, 'cache'):
             cached_answer = self.cache.get_answer(query, project.project_id)
@@ -164,9 +164,11 @@ class NLPController(BaseController):
         answer, full_prompt, chat_history = None, None, None
 
         # step1: retrieve related documents
-        retrieved_documents = await self.search_vector_db_collection(
+        retrieved_documents = await self.search_by_curriculum(
             project=project,
-            text=query,
+            query=query,
+            grade=grade,
+            subject=subject,
             limit=limit,
         )
 
@@ -199,19 +201,10 @@ class NLPController(BaseController):
         })
 
         # step3: Construct Generation Client Prompts
-        try:
-            chat_history = [
-                await self.generation_client.construct_prompt(
-                    prompt=system_prompt,
-                    role=self.generation_client.enums.SYSTEM.value,
-                )
-            ]
-            self.logger.info("Chat history constructed successfully")
-        except Exception as e:
-            self.logger.error(f"Error constructing chat history: {str(e)}")
-            return answer, full_prompt, chat_history
+        # We inline the system prompt to avoid role issues across providers
+        chat_history = [] 
 
-        full_prompt = "\n\n".join([ documents_prompts,  footer_prompt])
+        full_prompt = "\n\n".join([system_prompt, "### Context Documents:", documents_prompts, footer_prompt])
 
         # step4: Retrieve the Answer
         try:
@@ -232,7 +225,7 @@ class NLPController(BaseController):
             self.cache.set_answer(query, project.project_id, answer)
         return answer, full_prompt, chat_history
 
-    async def answer_rag_question_stream(self, project: Project, query: str, limit: int = 10):
+    async def answer_rag_question_stream(self, project: Project, query: str, limit: int = 10, grade: int = None, subject: str = None):
         """Stream the answer to a RAG question."""
         # Check cache first (streaming cache returned as single block for simplicity or not cached)
         if hasattr(self, 'cache'):
@@ -243,9 +236,11 @@ class NLPController(BaseController):
                 return
 
         # step1: retrieve related documents
-        retrieved_documents = await self.search_vector_db_collection(
+        retrieved_documents = await self.search_by_curriculum(
             project=project,
-            text=query,
+            query=query,
+            grade=grade,
+            subject=subject,
             limit=limit,
         )
 
@@ -277,14 +272,10 @@ class NLPController(BaseController):
         })
 
         # step3: Construct Generation Client Prompts
-        chat_history = [
-            await self.generation_client.construct_prompt(
-                prompt=system_prompt,
-                role=self.generation_client.enums.SYSTEM.value,
-            )
-        ]
+        # Inline system prompt for reliability
+        chat_history = []
 
-        full_prompt = "\n\n".join([ documents_prompts,  footer_prompt])
+        full_prompt = "\n\n".join([system_prompt, "### Context Documents:", documents_prompts, footer_prompt])
 
         # step4: Retrieve the Answer in streaming mode
         full_answer = []
@@ -298,3 +289,89 @@ class NLPController(BaseController):
         # Cache the full answer at the end
         if full_answer and hasattr(self, 'cache'):
             self.cache.set_answer(query, project.project_id, "".join(full_answer))
+
+    async def search_by_curriculum(
+        self,
+        project: Project,
+        query: str,
+        grade: int = None,
+        subject: str = None,
+        limit: int = 10
+    ):
+        """
+        Search vector DB filtered by curriculum metadata.
+        
+        This method filters chunks by curriculum metadata (grade, subject)
+        before performing semantic search, ensuring students get age-appropriate content.
+        
+        Args:
+            project: Project object
+            query: Search query text
+            grade: Filter by grade level (1-12), optional
+            subject: Filter by subject name (e.g., "Biology"), optional
+            limit: Maximum number of results to return
+        
+        Returns:
+            List of RetrievedDocument objects matching the curriculum filter
+        
+        Example:
+            # Get Grade 10 Biology content about Physics
+            results = await nlp.search_by_curriculum(
+                project=project,
+                query="Explain Physics",
+                grade=10,
+                subject="Biology",
+                limit=5
+            )
+        """
+        
+        # Build MongoDB filter for curriculum metadata
+        mongo_filter = {"chunk_project_id": project.id}
+        
+        if grade is not None:
+            mongo_filter["chunk_metadata.grade"] = grade
+        if subject:
+            mongo_filter["chunk_metadata.subject"] = subject
+        
+        self.logger.info(f"Searching with curriculum filter: {mongo_filter}")
+        
+        # Get matching chunks from MongoDB
+        matching_chunks = await self.db.chunks.find(mongo_filter).to_list(length=100)
+        
+        if not matching_chunks:
+            self.logger.warning(f"No chunks found matching curriculum filter: {mongo_filter}")
+            return []
+        
+        self.logger.info(f"Found {len(matching_chunks)} chunks matching curriculum filter")
+        
+        # Extract chunk texts for comparison
+        chunk_texts = {chunk["chunk_text"]: chunk for chunk in matching_chunks}
+        
+        # Perform regular vector search
+        all_results = await self.search_vector_db_collection(
+            project=project,
+            text=query,
+            limit=limit * 2  # Get more results to filter from
+        )
+        
+        if not all_results:
+            self.logger.warning("No results from vector search")
+            return []
+        
+        # Filter results to only include chunks matching curriculum
+        filtered_results = [
+            result for result in all_results
+            if result.text in chunk_texts
+        ]
+        
+        self.logger.info(f"Filtered to {len(filtered_results)} curriculum-appropriate results")
+        
+        # Rerank filtered results
+        if filtered_results:
+            filtered_results = await self.rerank_documents(
+                query=query,
+                documents=filtered_results,
+                top_k=min(limit, len(filtered_results))
+            )
+        
+        return filtered_results[:limit]

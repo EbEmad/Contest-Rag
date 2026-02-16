@@ -11,15 +11,17 @@ import logging
 logger = logging.getLogger(__name__)
 
 @celery_app.task(bind=True,name="tasks.file_processing.process_project_files",autoretry_for=(Exception,),retry_kwargs={"max_retries":3,"countdown":60})
-def process_project_files(self,project_id,file_id:int,chunk_size:int,overlap_size:int,do_reset:int):
+def process_project_files(self,project_id,file_id:int,chunk_size:int,overlap_size:int,do_reset:int,curriculum_metadata:dict=None):
     return asyncio.run(
         _process_project_files(self, project_id, file_id, chunk_size,
-                               overlap_size, do_reset)
+                               overlap_size, do_reset, curriculum_metadata)
     )
 
 async def _process_project_files(task_instance, project_id: int, 
                                  file_id: int, chunk_size: int,
-                                 overlap_size: int, do_reset: int):
+                                 overlap_size: int, do_reset: int,
+                                 curriculum_metadata: dict = None):
+
     
     mongo_conn,vectordb_client=None,None
     try:
@@ -197,16 +199,30 @@ async def _process_project_files(task_instance, project_id: int,
             
             # Skip empty chunks; DataChunk requires chunk_text min_length=1
             non_empty = [c for c in file_chunks if (c.page_content or "").strip()]
-            file_chunks_records = [
-                DataChunk(
-                    chunk_text=chunk.page_content.strip(),
-                    chunk_metadata=chunk.metadata,
-                    chunk_order=i + 1,
-                    chunk_project_id=project.id,
-                    chunk_asset_id=asset_id
+            
+            # Build chunk metadata
+            file_chunks_records = []
+            for i, chunk in enumerate(non_empty):
+                # Start with original chunk metadata
+                chunk_meta = chunk.metadata.copy() if chunk.metadata else {}
+                
+                # Add curriculum metadata if provided
+                if curriculum_metadata:
+                    chunk_meta.update({
+                        "grade": curriculum_metadata.get("grade"),
+                        "subject": curriculum_metadata.get("subject")
+                    })
+                
+                file_chunks_records.append(
+                    DataChunk(
+                        chunk_text=chunk.page_content.strip(),
+                        chunk_metadata=chunk_meta,  # ← Now includes curriculum metadata
+                        chunk_order=i + 1,
+                        chunk_project_id=project.id,
+                        chunk_asset_id=asset_id
+                    )
                 )
-                for i, chunk in enumerate(non_empty)
-            ]
+
             
             return await chunk_model.insert_many_chunks(chunks=file_chunks_records)
         # Process all files concurrently

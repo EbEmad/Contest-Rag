@@ -75,8 +75,12 @@ async def search_index(request: Request, project_id: str, search_request: Search
 
     nlp_controller = request.app.nlp_controller
 
-    results = await nlp_controller.search_vector_db_collection(
-        project=project, text=search_request.text, limit=search_request.limit
+    results = await nlp_controller.search_by_curriculum(
+        project=project,
+        query=search_request.text,
+        grade=search_request.grade,
+        subject=search_request.subject,
+        limit=search_request.limit
     )
 
     if not results:
@@ -114,6 +118,8 @@ async def answer_rag(request: Request, project_id: str, search_request: SearchRe
         project=project,
         query=search_request.text,
         limit=search_request.limit,
+        grade=search_request.grade,
+        subject=search_request.subject,
     )
 
     if not answer:
@@ -146,9 +152,15 @@ async def answer_rag_stream(request: Request, project_id: str, search_request: S
             project=project,
             query=search_request.text,
             limit=search_request.limit,
+            grade=search_request.grade,
+            subject=search_request.subject,
         ):
             if await request.is_disconnected():
                 break
-            yield f"data: {chunk}\n\n"
+            
+            # Helper to format SSE data correctly for multi-line chunks
+            # Standard SSE: replace newlines with "\ndata: "
+            formatted_chunk = chunk.replace("\n", "\ndata: ")
+            yield f"data: {formatted_chunk}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")

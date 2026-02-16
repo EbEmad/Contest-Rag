@@ -7,3 +7,5 @@ class PushRequest(BaseModel):
 class SearchRequest(BaseModel):
     text: str
     limit: Optional[int] = 5
+    grade: Optional[int] = None
+    subject: Optional[str] = None

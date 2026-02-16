@@ -7,3 +7,6 @@ class ProcessRequest(BaseModel):
     overlap_size: Optional[int] = 20
     do_reset: Optional[int] = 0
     
+    # Optional curriculum metadata
+    grade: Optional[int] = None
+    subject: Optional[str] = None

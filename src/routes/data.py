@@ -95,48 +95,79 @@ async def upload_data(request: Request, project_id: str, file: UploadFile,
 
 @data_router.post("/process/{project_id}")
 async def process_endpoint(request: Request, project_id: str, process_request: ProcessRequest):
-
+    """
+    Process uploaded files and optionally tag with curriculum metadata.
+    
+    If curriculum metadata (grade, subject) is provided,
+    chunks will be tagged for curriculum-aware RAG filtering.
+    """
+    
     chunk_size = process_request.chunk_size
     overlap_size = process_request.overlap_size
     do_reset = process_request.do_reset
+    
+    # Build curriculum metadata dict (only if provided)
+    curriculum_metadata = None
+    if process_request.grade is not None:
+        curriculum_metadata = {
+            "grade": process_request.grade,
+            "subject": process_request.subject
+        }
 
     task=process_project_files.delay(
         project_id=project_id,
         file_id=process_request.file_id,
         chunk_size=chunk_size,
         overlap_size=overlap_size,
-        do_reset=do_reset
+        do_reset=do_reset,
+        curriculum_metadata=curriculum_metadata  # ← Pass curriculum metadata
     )
 
     return JSONResponse(
         content={
             "signal": ResponseSignal.PROCESSING_SUCCESS.value,
-            "task_id": task.id
+            "task_id": task.id,
+            "curriculum_metadata": curriculum_metadata  # Return what was set
         }
     )
 
 
 
+
 @data_router.post("/process_and_push/{project_id}")
 async def process_and_push_endpoint(request: Request, project_id: str, process_request: ProcessRequest):
-
+    """
+    Process files and push to vector DB, optionally with curriculum metadata.
+    """
+    
     chunk_size = process_request.chunk_size
     overlap_size = process_request.overlap_size
     do_reset = process_request.do_reset
+    
+    # Build curriculum metadata dict (only if provided)
+    curriculum_metadata = None
+    if process_request.grade is not None:
+        curriculum_metadata = {
+            "grade": process_request.grade,
+            "subject": process_request.subject
+        }
 
     workflow_task=process_and_push_workflow.delay(
         project_id=project_id,
         file_id=process_request.file_id,
         chunk_size=chunk_size,
         overlap_size=overlap_size,
-        do_reset=do_reset
+        do_reset=do_reset,
+        curriculum_metadata=curriculum_metadata  # ← Pass curriculum metadata
     )
 
     return JSONResponse(
         content={
             "signal": ResponseSignal.PROCESS_AND_PUSH_WORKFLOW_READY.value,
-            "workflow_task_id": workflow_task.id
+            "workflow_task_id": workflow_task.id,
+            "curriculum_metadata": curriculum_metadata
         }
     )
+
 
     

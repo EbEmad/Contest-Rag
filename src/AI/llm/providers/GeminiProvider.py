@@ -52,17 +52,34 @@ class GeminiProvider(LLMInterface):
             return None
         
         try:
+            # Extract system instruction from chat_history if present
+            system_instruction = None
+            clean_history = []
+            if chat_history:
+                for msg in chat_history:
+                    if msg.get("role") == "system":
+                        # Extract text from parts
+                        parts = msg.get("parts", [])
+                        if parts and isinstance(parts[0], dict):
+                            system_instruction = parts[0].get("text")
+                        elif parts and isinstance(parts[0], str):
+                             system_instruction = parts[0]
+                    else:
+                        clean_history.append(msg)
+
             config=GenerateContentConfig(
                 temperature=temperature or self.default_generation_temperature,
                 max_output_tokens=max_output_tokens or self.default_generation_max_output_tokens,
+                system_instruction=system_instruction
             )
-            # create chat session
-            chat = self.client.aio.chats.create(model=self.generation_model_id)
-            # add user prompt to history
-            chat_history.append(
-                await self.construct_prompt(prompt=prompt,role=GeminiEnums.USER.value)
-            )
-            # send a message with a full history
+            # create chat session with CLEAN history (no system role)
+            chat = self.client.aio.chats.create(model=self.generation_model_id, history=clean_history)
+            
+            # send the user message (prompt)
+            # define content directly or use construct_prompt? 
+            # construct_prompt creates a dict {"role":..., "parts":...} which is for history.
+            # send_message takes string or parts.
+            
             response= await  chat.send_message(
                 message=prompt,
                 config=config,
@@ -152,15 +169,31 @@ class GeminiProvider(LLMInterface):
             return
 
         try:
+            # Extract system instruction from chat_history if present
+            system_instruction = None
+            clean_history = []
+            if chat_history:
+                for msg in chat_history:
+                    if msg.get("role") == "system":
+                        # Extract text from parts
+                        parts = msg.get("parts", [])
+                        if parts and isinstance(parts[0], dict):
+                            system_instruction = parts[0].get("text")
+                        elif parts and isinstance(parts[0], str):
+                             system_instruction = parts[0]
+                    else:
+                        clean_history.append(msg)
+            
             config = GenerateContentConfig(
                 temperature=temperature or self.default_generation_temperature,
                 max_output_tokens=max_output_tokens or self.default_generation_max_output_tokens,
+                system_instruction=system_instruction
             )
             # Add user prompt to history (Gemini SDK handles history via the chat session)
             # However, our interface expects us to manage it or at least handle the current message.
             # The Gemini SDK `aio.chats.create` can take history.
             
-            chat = self.client.aio.chats.create(model=self.generation_model_id, history=chat_history)
+            chat = self.client.aio.chats.create(model=self.generation_model_id, history=clean_history)
             
             response = await chat.send_message_stream(
                 message=prompt,
@@ -178,7 +211,7 @@ class GeminiProvider(LLMInterface):
     async def construct_prompt(self, prompt: str, role: str):
         return {
             "role": role,
-            "parts": [await self.process_text(prompt)]
+            "parts": [{"text": await self.process_text(prompt)}]
         }
 
         

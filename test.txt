@@ -1,0 +1,78 @@
+Physics Educational Sample Data
+================================
+
+Topic 1: Motion
+---------------
+Motion is the change in position of an object over time.
+Speed is the distance traveled divided by time.
+Velocity is speed with direction.
+Acceleration is the rate of change of velocity.
+
+Formula:
+Speed = Distance / Time
+Acceleration = (Final Velocity - Initial Velocity) / Time
+
+Example:
+If a car travels 100 meters in 10 seconds,
+Speed = 100 / 10 = 10 m/s
+
+
+Topic 2: Newton's Laws of Motion
+--------------------------------
+
+First Law:
+An object remains at rest or in uniform motion unless acted upon by an external force.
+
+Second Law:
+Force equals mass times acceleration.
+Formula: F = m × a
+
+Third Law:
+For every action, there is an equal and opposite reaction.
+
+
+Topic 3: Energy
+---------------
+
+Energy is the ability to do work.
+
+Kinetic Energy:
+Energy of motion.
+Formula: KE = 1/2 × m × v^2
+
+Potential Energy:
+Stored energy due to position.
+Formula: PE = m × g × h
+
+Where:
+m = mass
+v = velocity
+g = gravity (9.8 m/s^2)
+h = height
+
+
+Topic 4: Electricity
+--------------------
+
+Electric current is the flow of electric charge.
+Voltage is the electrical potential difference.
+Resistance is the opposition to current flow.
+
+Ohm's Law:
+V = I × R
+
+Where:
+V = Voltage
+I = Current
+R = Resistance
+
+
+Topic 5: Waves
+--------------
+
+A wave is a disturbance that transfers energy.
+Wavelength is the distance between two wave peaks.
+Frequency is the number of waves per second.
+
+Wave Speed Formula:
+Wave Speed = Frequency × Wavelength

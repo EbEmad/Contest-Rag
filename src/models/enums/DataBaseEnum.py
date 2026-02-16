@@ -5,3 +5,4 @@ class DataBaseEnum(Enum):
     COLLECTION_CHUNK_NAME= "chunks"
     COLLECTION_ASSET_NAME= "assets"
     COLLECTION_CELERY_TASK_EXECUTION_NAME= "celery_task_executions"
+    COLLECTION_USER_NAME="users"

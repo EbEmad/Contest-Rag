@@ -16,6 +16,7 @@ async def startup_span():
     settings = get_settings()
     app.mongo_conn = AsyncIOMotorClient(settings.MONGODB_URL)
     app.db_client = app.mongo_conn[settings.MONGODB_DATABASE]
+    app.db = app.db_client  # Add db shorthand for controllers
 
     # Redis cache manager (connect on startup)
     app.cache_manager = CacheManager(
@@ -64,6 +65,8 @@ async def startup_span():
     )
     # attach cache to NLP controller if available
     app.nlp_controller.cache = app.cache_manager
+    # attach db to NLP controller for curriculum filtering
+    app.nlp_controller.db = app.db_client
 
 
 async def shutdown_span():
@@ -76,3 +79,4 @@ app.on_event("shutdown")(shutdown_span)
 app.include_router(base.base_router)
 app.include_router(data.data_router)
 app.include_router(nlp.nlp_router)
+# app.include_router(curriculum.curriculum_router)  # ← Add curriculum routes
