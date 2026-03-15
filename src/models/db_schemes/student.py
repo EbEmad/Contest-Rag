@@ -1,11 +1,11 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Any
 from bson.objectid import ObjectId
 from datetime import datetime
 
 class StudentProfile(BaseModel):
     """Student profile for tracking learning progress"""
-    id: Optional[ObjectId] = Field(None, alias="_id")
+    id: Optional[Any] = Field(None, alias="_id")
     user_id: str  # From auth system (email, username, etc.)
     full_name: str
     grade: int  # Current grade level (1-12)

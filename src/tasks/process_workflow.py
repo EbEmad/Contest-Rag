@@ -1,5 +1,5 @@
 from celery import chain
-from celery_app import celery_app,get_setup_utils
+from celery_app import celery_app
 from helpers.config import get_settings
 from tasks.file_processing import process_project_files
 from tasks.data_indexing import _index_data_content
@@ -34,9 +34,10 @@ def push_after_process_task(self, prev_task_result):
                 )
 def process_and_push_workflow(self, project_id: int, 
                                 file_id: int, chunk_size: int,
-                                overlap_size: int, do_reset: int):
+                                overlap_size: int, do_reset: int,
+                                curriculum_metadata: dict = None):
     workflow=chain(
-        process_project_files.s(project_id, file_id, chunk_size, overlap_size, do_reset),
+        process_project_files.s(project_id, file_id, chunk_size, overlap_size, do_reset, curriculum_metadata),
         push_after_process_task.s()
     )
 

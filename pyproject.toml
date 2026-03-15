@@ -30,4 +30,5 @@ dependencies = [
     "sentence-transformers>=5.2.2",
     "uvicorn[standard]==0.29.0",
     "vine==5.1.0",
+    "aioboto3==13.1.1",
 ]

@@ -9,3 +9,4 @@ class SearchRequest(BaseModel):
     limit: Optional[int] = 5
     grade: Optional[int] = None
     subject: Optional[str] = None
+    student_id: Optional[str] = None

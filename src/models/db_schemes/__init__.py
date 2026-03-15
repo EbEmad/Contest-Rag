@@ -6,3 +6,4 @@ from .curriculum import Subject, Chapter, Topic
 from .quiz import Question, QuizAttempt, QuestionType, DifficultyLevel
 from .performance import TopicPerformance, LearningRoadmap
 from .student import StudentProfile
+from .chat_message import ChatMessage

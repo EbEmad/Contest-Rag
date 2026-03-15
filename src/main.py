@@ -1,15 +1,22 @@
 from fastapi import FastAPI
 from routes import base, data, nlp
+from routes import quiz, performance, curriculum
 from motor.motor_asyncio import AsyncIOMotorClient
 from helpers.config import get_settings
 from helpers.cache import CacheManager
 from AI.llm.LLMProviderFactory import LLMProviderFactory
 from AI.vectordb.VectorDBProviderFactory import VectorDBProviderFactory
 from AI.llm.templates.template_parser import TemplateParser
-from controllers import NLPController
+from controllers import NLPController, QuizController, PerformanceController
 from models.ProjectModel import ProjectModel
 from models.ChunkModel import ChunkModel
 from models.AssetModel import AssetModel
+from models.StudentModel import StudentModel
+from models.QuizModel import QuizModel
+from models.PerformanceModel import PerformanceModel
+from models.CurriculumModel import CurriculumModel
+from models.ChatMessageModel import ChatMessageModel
+
 app = FastAPI()
 
 async def startup_span():
@@ -68,6 +75,30 @@ async def startup_span():
     # attach db to NLP controller for curriculum filtering
     app.nlp_controller.db = app.db_client
 
+    # ── EduBot models ──────────────────────────────────────────────────────────
+    app.student_model = await StudentModel.create_instance(db_client=app.db_client)
+    app.quiz_model = await QuizModel.create_instance(db_client=app.db_client)
+    app.performance_model = await PerformanceModel.create_instance(db_client=app.db_client)
+    app.curriculum_model = await CurriculumModel.create_instance(db_client=app.db_client)
+
+    # ── Chat memory ──────────────────────────────────────────────────────────
+    app.chat_message_model = await ChatMessageModel.create_instance(db_client=app.db_client)
+
+    # ── EduBot controllers ─────────────────────────────────────────────────────
+    app.quiz_controller = QuizController(
+        quiz_model=app.quiz_model,
+        generation_client=app.generation_client,
+        template_parser=app.template_parser,
+    )
+    app.performance_controller = PerformanceController(
+        performance_model=app.performance_model,
+        quiz_model=app.quiz_model,
+        student_model=app.student_model,
+        curriculum_model=app.curriculum_model,
+        generation_client=app.generation_client,
+        template_parser=app.template_parser,
+    )
+
 
 async def shutdown_span():
     app.mongo_conn.close()
@@ -79,4 +110,6 @@ app.on_event("shutdown")(shutdown_span)
 app.include_router(base.base_router)
 app.include_router(data.data_router)
 app.include_router(nlp.nlp_router)
-# app.include_router(curriculum.curriculum_router)  # ← Add curriculum routes
+app.include_router(quiz.quiz_router)
+app.include_router(performance.performance_router)
+app.include_router(curriculum.curriculum_router)

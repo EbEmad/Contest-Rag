@@ -31,10 +31,7 @@ class IdempotencyManager:
             started_at=datetime.utcnow()
         )
         
-        # MongoDB equivalent of SQLAlchemy session.add() + commit() + refresh()
-        # db_client is the database object (mongo_conn[database_name])
-        # We need to get the collection from the database
-        
+        # We need to get the collection from the database        
         #collection = self.db_client[DataBaseEnum.COLLECTION_CELERY_TASK_EXECUTION_NAME.value]
         try:
             result = await self.collection.insert_one(

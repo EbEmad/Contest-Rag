@@ -210,8 +210,60 @@ sequenceDiagram
     LLM-->>Adaptive: Detailed roadmap markdown
     Adaptive->>DB: Save roadmap
     Adaptive-->>Student: Personalized learning plan
+
+
 ```
 
+### 🛡️ Detailed Roadmap Generation (Automated)
+
+This diagram shows how the system automatically fetches student and performance data to inform the AI, without requiring manual input of topic names.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant API as performance.py (Route)
+    participant CTRL as PerformanceController.py (Controller)
+    participant SM as StudentModel.py (Model)
+    participant PM as PerformanceModel.py (Model)
+    participant CM as CurriculumModel.py (Model)
+    participant AI as LLM Client
+
+    Note over API, AI: Automated Roadmap Generation Flow
+
+    API->>CTRL: generate_roadmap(student_id)
+    
+    rect rgb(240, 240, 240)
+        Note right of CTRL: Step 1: Identify Student
+        CTRL->>SM: get_student_by_id(student_id)
+        SM-->>CTRL: {full_name, grade, current_level}
+    end
+
+    rect rgb(240, 240, 240)
+        Note right of CTRL: Step 2: Identify Weakness
+        CTRL->>PM: get_weak_topics(student_id)
+        PM-->>CTRL: List[TopicPerformance] (Topic IDs)
+    end
+
+    rect rgb(240, 240, 240)
+        Note right of CTRL: Step 3: Translate to Names
+        loop for each Weak Topic ID
+            CTRL->>CM: get_topic(topic_id)
+            CM-->>CTRL: Topic Name (e.g. "Newton Laws")
+        end
+    end
+
+    rect rgb(240, 240, 240)
+        Note right of CTRL: Step 4: Generate LLM study plan
+        CTRL->>AI: generate_text(Prompt with Names & Grade)
+        AI-->>CTRL: "Your 2-week plan for Physics..."
+    end
+
+    rect rgb(240, 240, 240)
+        Note right of CTRL: Step 5: Save & Return
+        CTRL->>PM: save_roadmap(LearningRoadmap)
+        CTRL-->>API: JSON Response (roadmap_id, llm_explanation)
+    end
+```
 ### 👩‍🏫 Teacher Analytics Flow
 
 ```mermaid

@@ -9,22 +9,30 @@ from utils.idempotency_manager import IdempotencyManager
 import asyncio
 import logging
 logger = logging.getLogger(__name__)
+# Add a file handler to capture worker logs since we can't see the worker terminal
+file_handler = logging.FileHandler("/home/ebemad/a/Contest-Rag/worker_debug.log")
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+
+logger.addHandler(file_handler)
+logger.setLevel(logging.INFO)
 
 @celery_app.task(bind=True,name="tasks.file_processing.process_project_files",autoretry_for=(Exception,),retry_kwargs={"max_retries":3,"countdown":60})
 def process_project_files(self,project_id,file_id:int,chunk_size:int,overlap_size:int,do_reset:int,curriculum_metadata:dict=None):
+    logger.info(f"STARTING TASK: process_project_files for project {project_id}, file {file_id}")
     return asyncio.run(
         _process_project_files(self, project_id, file_id, chunk_size,
                                overlap_size, do_reset, curriculum_metadata)
     )
 
-async def _process_project_files(task_instance, project_id: int, 
-                                 file_id: int, chunk_size: int,
+async def _process_project_files(task_instance, project_id: str, 
+                                 file_id: str, chunk_size: int,
                                  overlap_size: int, do_reset: int,
                                  curriculum_metadata: dict = None):
 
     
     mongo_conn,vectordb_client=None,None
     try:
+        logger.info(f"Loading setup utils for task...")
         (
             mongo_conn,
             db_client,
@@ -39,6 +47,7 @@ async def _process_project_files(task_instance, project_id: int,
             asset_model,
             nlp_controller
         ) = await get_setup_utils()
+        logger.info("Setup utils loaded successfully.")
 
         # Create idempotency manager
         idempotency_manager = IdempotencyManager(db_client)
@@ -62,7 +71,7 @@ async def _process_project_files(task_instance, project_id: int,
         )
 
         if not should_execute:
-            logger.warning(f"Can not handle th task | status: {existing_task.status}")
+            logger.warning(f"Task already executed or running | status: {existing_task.status}")
             return existing_task.result
 
         task_record=None
@@ -86,24 +95,33 @@ async def _process_project_files(task_instance, project_id: int,
             execution_id=task_record.id,
             status='STARTED'
         )
-       
+        logger.info(f"Task record {task_record.id} set to STARTED.")
 
         project = await project_model.get_project_or_create_one(
             project_id=project_id
         )
-
-        # asset_model = await AssetModel.create_instance(
-        #         db_client=db_client
-        #     )
+        logger.info(f"Using project {project_id} (ID: {project.id})")
 
         project_files_ids = {}
         if file_id:
-            asset_record = await asset_model.get_asset_record(
-                asset_project_id=project.id,
-                asset_name=file_id
-            )
+            asset_record = None
+            
+            # Try lookup by ObjectId first (since API returns IDs)
+            if isinstance(file_id, str) and len(file_id) == 24:
+                try:
+                    asset_record = await asset_model.get_asset_by_id(file_id)
+                except:
+                    pass
+            
+            # Fallback to lookup by name
+            if not asset_record:
+                asset_record = await asset_model.get_asset_record(
+                    asset_project_id=project.id,
+                    asset_name=file_id
+                )
 
             if asset_record is None:
+                logger.error(f"Asset not found for file_id: {file_id}")
                 task_instance.update_state(
                         state="FAILURE",
                         meta={
@@ -116,21 +134,15 @@ async def _process_project_files(task_instance, project_id: int,
                     status='FAILURE',
                     result={"signal": ResponseSignal.FILE_ID_ERROR.value}
                 )
-                raise Exception(f"File with ID {file_id} ")
-                # return JSONResponse(
-                #     status_code=status.HTTP_400_BAD_REQUEST,
-                #     content={
-                #         "signal": ResponseSignal.FILE_ID_ERROR.value,
-                #     }
-                # )
-
+                raise Exception(f"File with ID {file_id} not found")
+            
+            logger.info(f"Found asset {asset_record.asset_name} (ID: {asset_record.id})")
             project_files_ids = {
                 asset_record.id: asset_record.asset_name
             }
         
         else:
-            
-
+            logger.info("No file_id provided, processing all project files.")
             project_files = await asset_model.get_all_project_assets(
                 asset_project_id=project.id,
                 asset_type=AssetTypeEnum.FILE.value,
@@ -142,7 +154,7 @@ async def _process_project_files(task_instance, project_id: int,
             }
 
         if len(project_files_ids) == 0:
-
+            logger.warning("No files found to process.")
             task_instance.update_state(
                         state="FAILURE",
                         meta={
@@ -156,79 +168,20 @@ async def _process_project_files(task_instance, project_id: int,
                 result={"signal": ResponseSignal.NO_FILES_ERROR.value}
             )
             raise Exception(f"No files found in project {project.project_id}")
-            
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content={
-                    "signal": ResponseSignal.NO_FILES_ERROR.value,
-                }
-            )
         
         process_controller = ProcessController(project_id=project_id)
 
-        no_records = 0
-        no_files = 0
-
-        # chunk_model = await ChunkModel.create_instance(
-        #                     db_client=db_client
-        #                 )
-
         if do_reset == 1:
+            logger.info("Resetting project chunks (do_reset=1)")
             _ = await chunk_model.delete_chunks_by_project_id(
                 project_id=project.id
             )
 
-        async def process_single_file(asset_id, file_id, process_controller, chunk_model, project, chunk_size, overlap_size):
-            """Process a single file."""
-            file_content = await process_controller.get_file_content(file_id=file_id)
-            
-            if file_content is None:
-                logger.error(f"Error while processing file: {file_id}")
-                return 0
-            
-            file_chunks = await process_controller.process_file_content_semantic(
-                file_content=file_content,
-                file_id=file_id,
-                #chunk_size=chunk_size,
-                #overlap_size=overlap_size
-            )
-            
-            if file_chunks is None or len(file_chunks) == 0:
-                logger.warning(f"No chunks created for file: {file_id}")
-                pass 
-            
-            # Skip empty chunks; DataChunk requires chunk_text min_length=1
-            non_empty = [c for c in file_chunks if (c.page_content or "").strip()]
-            
-            # Build chunk metadata
-            file_chunks_records = []
-            for i, chunk in enumerate(non_empty):
-                # Start with original chunk metadata
-                chunk_meta = chunk.metadata.copy() if chunk.metadata else {}
-                
-                # Add curriculum metadata if provided
-                if curriculum_metadata:
-                    chunk_meta.update({
-                        "grade": curriculum_metadata.get("grade"),
-                        "subject": curriculum_metadata.get("subject")
-                    })
-                
-                file_chunks_records.append(
-                    DataChunk(
-                        chunk_text=chunk.page_content.strip(),
-                        chunk_metadata=chunk_meta,  # ← Now includes curriculum metadata
-                        chunk_order=i + 1,
-                        chunk_project_id=project.id,
-                        chunk_asset_id=asset_id
-                    )
-                )
-
-            
-            return await chunk_model.insert_many_chunks(chunks=file_chunks_records)
+        
         # Process all files concurrently
 
         tasks = [
-            process_single_file(asset_id, file_id, process_controller, chunk_model, project, chunk_size, overlap_size)
+            _process_single_file(asset_id, file_id, process_controller, chunk_model, project, chunk_size, overlap_size,curriculum_metadata)
             for asset_id, file_id in project_files_ids.items()
         ]
         results = await asyncio.gather(*tasks)
@@ -267,3 +220,58 @@ async def _process_project_files(task_instance, project_id: int,
                 vectordb_client.disconnect()
         except Exception as e:
             logger.error(f"Task failed while cleaning: {str(e)}")
+
+async def _process_single_file(asset_id, filename, process_controller, chunk_model, project, chunk_size, overlap_size,curriculum_metadata):
+            """Process a single file."""
+            logger.info(f"Processing file: {filename}")
+            file_content = await process_controller.get_file_content(file_id=filename)
+            
+            if file_content is None:
+                logger.error(f"Error while loading content for file: {filename}")
+                return 0
+            
+            # Temporarily switch to standard chunking for debugging
+            logger.info("Using standard RecursiveCharacterTextSplitter for processing.")
+            file_chunks = await process_controller.process_file_content(
+                file_content=file_content,
+                file_id=filename,
+                chunk_size=chunk_size,
+                overlap_size=overlap_size
+            )
+            
+            if file_chunks is None or len(file_chunks) == 0:
+                logger.warning(f"No chunks created for file: {filename}")
+                return 0
+            
+            logger.info(f"Created {len(file_chunks)} chunks for file: {filename}")
+            
+            # Skip empty chunks; DataChunk requires chunk_text min_length=1
+            non_empty = [c for c in file_chunks if (c.page_content or "").strip()]
+            
+            # Build chunk metadata
+            file_chunks_records = []
+            for i, chunk in enumerate(non_empty):
+                # Start with original chunk metadata
+                chunk_meta = chunk.metadata.copy() if chunk.metadata else {}
+                
+                # Add curriculum metadata if provided
+                if curriculum_metadata:
+                    chunk_meta.update({
+                        "grade": curriculum_metadata.get("grade"),
+                        "subject": curriculum_metadata.get("subject"),
+                        "chapter_name": curriculum_metadata.get("chapter_name"),
+                        "topic_names": curriculum_metadata.get("topic_names")
+                    })
+                
+                file_chunks_records.append(
+                    DataChunk(
+                        chunk_text=chunk.page_content.strip(),
+                        chunk_metadata=chunk_meta,
+                        chunk_order=i + 1,
+                        chunk_project_id=project.id,
+                        chunk_asset_id=asset_id
+                    )
+                )
+
+            logger.info(f"Inserting {len(file_chunks_records)} chunk records into DB...")
+            return await chunk_model.insert_many_chunks(chunks=file_chunks_records)

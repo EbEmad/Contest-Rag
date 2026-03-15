@@ -1,5 +1,5 @@
 from pydantic import BaseModel,Field
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 from bson.objectid import ObjectId
 from datetime import datetime
 from enum import Enum
@@ -16,14 +16,14 @@ class DifficultyLevel(str, Enum):
 
 class Question(BaseModel):
     id: Optional[ObjectId] = Field(None, alias="_id")
-    topic_id:ObjectId
+    topic_id: Any
     question_type:QuestionType
     question_text:str
     options: Optional[List[str]] = None
     correct_answer: str
     difficulty: DifficultyLevel
     generated_by: str = "AI"
-    source_chunks: List[ObjectId] = []
+    source_chunks: List[Any] = []
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
     class Config:
@@ -32,9 +32,9 @@ class Question(BaseModel):
 
 class QuizAttempt(BaseModel):
     id: Optional[ObjectId] = Field(None, alias="_id")
-    student_id: ObjectId
-    topic_id:ObjectId
-    questions: List[ObjectId]
+    student_id: Any
+    topic_id: Any
+    questions: List[Any]
     answers: Dict[str, str] = {}
     score: Optional[float] = None
     max_score: float

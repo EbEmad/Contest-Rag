@@ -2,19 +2,15 @@ from fastapi import FastAPI, APIRouter, Depends, UploadFile, status, Request
 from fastapi.responses import JSONResponse
 import os
 from helpers.config import get_settings, Settings
-from controllers import DataController, ProjectController, ProcessController
+from controllers import DataController
 import aiofiles
 from models import ResponseSignal
 import logging
 from .schemes.data import ProcessRequest
-from models.ProjectModel import ProjectModel
-from models.ChunkModel import ChunkModel
-from models.AssetModel import AssetModel
-from models.db_schemes import DataChunk, Asset
+from models.db_schemes import  Asset
 from models.enums.AssetTypeEnum import AssetTypeEnum
 from tasks.file_processing import process_project_files
 from tasks.process_workflow import process_and_push_workflow
-import asyncio
 logger = logging.getLogger('uvicorn.error')
 
 data_router = APIRouter(
@@ -27,9 +23,6 @@ async def upload_data(request: Request, project_id: str, file: UploadFile,
                       app_settings: Settings = Depends(get_settings)):
         
     
-    # project_model = await ProjectModel.create_instance(
-    #     db_client=request.app.db_client
-    # )
     project_model=request.app.project_model
 
     project = await project_model.get_project_or_create_one(
@@ -49,7 +42,6 @@ async def upload_data(request: Request, project_id: str, file: UploadFile,
             }
         )
 
-    project_dir_path = ProjectController().get_project_path(project_id=project_id)
     file_path, file_id = data_controller.generate_unique_filepath(
         orig_file_name=file.filename,
         project_id=project_id
@@ -70,10 +62,6 @@ async def upload_data(request: Request, project_id: str, file: UploadFile,
             }
         )
 
-    # store the assets into the database
-    # asset_model = await AssetModel.create_instance(
-    #     db_client=request.app.db_client
-    # )
 
     asset_model=request.app.asset_model
 
@@ -111,7 +99,9 @@ async def process_endpoint(request: Request, project_id: str, process_request: P
     if process_request.grade is not None:
         curriculum_metadata = {
             "grade": process_request.grade,
-            "subject": process_request.subject
+            "subject": process_request.subject,
+            "chapter_name": process_request.chapter_name,
+            "topic_names": process_request.topic_names
         }
 
     task=process_project_files.delay(
@@ -149,7 +139,9 @@ async def process_and_push_endpoint(request: Request, project_id: str, process_r
     if process_request.grade is not None:
         curriculum_metadata = {
             "grade": process_request.grade,
-            "subject": process_request.subject
+            "subject": process_request.subject,
+            "chapter_name": process_request.chapter_name,
+            "topic_names": process_request.topic_names
         }
 
     workflow_task=process_and_push_workflow.delay(
