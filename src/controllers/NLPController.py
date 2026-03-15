@@ -153,15 +153,16 @@ class NLPController(BaseController):
         scored_docs.sort(key=lambda x: x[1], reverse=True)
         
         return [doc for doc, score in scored_docs[:top_k]]
-    
-    async def answer_rag_question(self, project: Project, query: str, limit: int = 10, grade: int = None, subject: str = None):
+            
+    async def answer_rag_question(self, project: Project, query: str, limit: int = 10, grade: int = None, subject: str = None, chat_history: list = None):
         # Check cache first
         if hasattr(self, 'cache'):
             cached_answer = self.cache.get_answer(query, project.project_id)
             if cached_answer:
                 self.logger.info("Returning cached answer")
                 return cached_answer, None, None
-        answer, full_prompt, chat_history = None, None, None
+        answer, full_prompt = None, None
+        chat_history = chat_history or []
 
         # step1: retrieve related documents
         retrieved_documents = await self.search_by_curriculum(
@@ -202,7 +203,6 @@ class NLPController(BaseController):
 
         # step3: Construct Generation Client Prompts
         # We inline the system prompt to avoid role issues across providers
-        chat_history = [] 
 
         full_prompt = "\n\n".join([system_prompt, "### Context Documents:", documents_prompts, footer_prompt])
 
@@ -225,7 +225,7 @@ class NLPController(BaseController):
             self.cache.set_answer(query, project.project_id, answer)
         return answer, full_prompt, chat_history
 
-    async def answer_rag_question_stream(self, project: Project, query: str, limit: int = 10, grade: int = None, subject: str = None):
+    async def answer_rag_question_stream(self, project: Project, query: str, limit: int = 10, grade: int = None, subject: str = None, chat_history: list = None):
         """Stream the answer to a RAG question."""
         # Check cache first (streaming cache returned as single block for simplicity or not cached)
         if hasattr(self, 'cache'):
@@ -273,7 +273,7 @@ class NLPController(BaseController):
 
         # step3: Construct Generation Client Prompts
         # Inline system prompt for reliability
-        chat_history = []
+        chat_history = chat_history or []
 
         full_prompt = "\n\n".join([system_prompt, "### Context Documents:", documents_prompts, footer_prompt])
 
@@ -331,7 +331,9 @@ class NLPController(BaseController):
         if grade is not None:
             mongo_filter["chunk_metadata.grade"] = grade
         if subject:
-            mongo_filter["chunk_metadata.subject"] = subject
+            #            mongo_filter["chunk_metadata.subject"] = subject
+            # Case-insensitive subject matching using regex
+            mongo_filter["chunk_metadata.subject"] = {"$regex": f"^{subject}$", "$options": "i"}
         
         self.logger.info(f"Searching with curriculum filter: {mongo_filter}")
         

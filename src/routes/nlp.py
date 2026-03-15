@@ -1,9 +1,6 @@
-from fastapi import FastAPI, APIRouter, status, Request
+from fastapi import  APIRouter, status, Request
 from fastapi.responses import JSONResponse
 from routes.schemes.nlp import PushRequest, SearchRequest
-from models.ProjectModel import ProjectModel
-from models.ChunkModel import ChunkModel
-from controllers import NLPController
 from models import ResponseSignal
 from tasks.data_indexing import index_data_content
 
@@ -39,12 +36,6 @@ async def get_project_index_info(request: Request, project_id: str):
         project_id=project_id
     )
 
-    # nlp_controller = NLPController(
-    #     vectordb_client=request.app.vectordb_client,
-    #     generation_client=request.app.generation_client,
-    #     embedding_client=request.app.embedding_client,
-    #     template_parser=request.app.template_parser,
-    # )
 
     nlp_controller = request.app.nlp_controller
 
@@ -65,13 +56,6 @@ async def search_index(request: Request, project_id: str, search_request: Search
     project = await project_model.get_project_or_create_one(
         project_id=project_id
     )
-
-    # nlp_controller = NLPController(
-    #     vectordb_client=request.app.vectordb_client,
-    #     generation_client=request.app.generation_client,
-    #     embedding_client=request.app.embedding_client,
-    #     template_parser=request.app.template_parser,
-    # )
 
     nlp_controller = request.app.nlp_controller
 
@@ -107,19 +91,35 @@ async def answer_rag(request: Request, project_id: str, search_request: SearchRe
         project_id=project_id
     )
 
-    # nlp_controller = NLPController(
-    #     vectordb_client=request.app.vectordb_client,
-    #     generation_client=request.app.generation_client,
-    #     embedding_client=request.app.embedding_client,
-    #     template_parser=request.app.template_parser,
-    # )
     nlp_controller = request.app.nlp_controller
-    answer, full_prompt, chat_history = await nlp_controller.answer_rag_question(
+
+    # ── Build chat history from memory (if student_id provided) ──
+    chat_history = []
+    chat_message_model = getattr(request.app, "chat_message_model", None)
+
+    if search_request.student_id and chat_message_model:
+        past_messages = await chat_message_model.get_recent_messages(
+            student_id=search_request.student_id,
+            project_id=project_id,
+            limit=10,
+        )
+        chat_history = []
+        for msg in past_messages:
+            # Map database roles ("user", "model") to provider-specific enums
+            if msg.role == "model" or msg.role == "assistant":
+                role = nlp_controller.generation_client.enums.ASSISTANT.value
+            else:
+                role = nlp_controller.generation_client.enums.USER.value
+            formatted_msg = await nlp_controller.generation_client.construct_prompt(prompt=msg.content, role=role)
+            chat_history.append(formatted_msg)
+
+    answer, full_prompt, _ = await nlp_controller.answer_rag_question(
         project=project,
         query=search_request.text,
         limit=search_request.limit,
         grade=search_request.grade,
         subject=search_request.subject,
+        chat_history=chat_history,
     )
 
     if not answer:
@@ -129,15 +129,29 @@ async def answer_rag(request: Request, project_id: str, search_request: SearchRe
                     "signal": ResponseSignal.RAG_ANSWER_ERROR.value
                 }
         )
-    
+
+    # ── Persist conversation turn ──
+    if search_request.student_id and chat_message_model:
+        await chat_message_model.add_message(
+            student_id=search_request.student_id,
+            project_id=project_id,
+            role="user",
+            content=search_request.text,
+        )
+        await chat_message_model.add_message(
+            student_id=search_request.student_id,
+            project_id=project_id,
+            role="model",
+            content=answer,
+        )
+
     return JSONResponse(
         content={
             "signal": ResponseSignal.RAG_ANSWER_SUCCESS.value,
             "answer": answer,
-            #"full_prompt": full_prompt,
-            #"chat_history": chat_history
         }
     )
+
 @nlp_router.post("/index/answer_stream/{project_id}")
 async def answer_rag_stream(request: Request, project_id: str, search_request: SearchRequest):
     from fastapi.responses import StreamingResponse
@@ -146,21 +160,56 @@ async def answer_rag_stream(request: Request, project_id: str, search_request: S
     project = await project_model.get_project_or_create_one(project_id=project_id)
     
     nlp_controller = request.app.nlp_controller
+    chat_message_model = getattr(request.app, "chat_message_model", None)
+
+    # ── Build chat history from memory ──
+    chat_history = []
+    if search_request.student_id and chat_message_model:
+        past_messages = await chat_message_model.get_recent_messages(
+            student_id=search_request.student_id,
+            project_id=project_id,
+            limit=10,
+        )
+        chat_history = []
+        for msg in past_messages:
+            if msg.role == "model" or msg.role == "assistant":
+                role = nlp_controller.generation_client.enums.ASSISTANT.value
+            else:
+                role = nlp_controller.generation_client.enums.USER.value
+            formatted_msg = await nlp_controller.generation_client.construct_prompt(prompt=msg.content, role=role)
+            chat_history.append(formatted_msg)
 
     async def event_generator():
+        full_answer_parts = []
         async for chunk in nlp_controller.answer_rag_question_stream(
             project=project,
             query=search_request.text,
             limit=search_request.limit,
             grade=search_request.grade,
             subject=search_request.subject,
+            chat_history=chat_history,
         ):
             if await request.is_disconnected():
                 break
-            
-            # Helper to format SSE data correctly for multi-line chunks
-            # Standard SSE: replace newlines with "\ndata: "
+            full_answer_parts.append(chunk)
             formatted_chunk = chunk.replace("\n", "\ndata: ")
             yield f"data: {formatted_chunk}\n\n"
 
+        # ── Persist conversation turn after stream completes ──
+        if search_request.student_id and chat_message_model and full_answer_parts:
+            full_answer = "".join(full_answer_parts)
+            await chat_message_model.add_message(
+                student_id=search_request.student_id,
+                project_id=project_id,
+                role="user",
+                content=search_request.text,
+            )
+            await chat_message_model.add_message(
+                student_id=search_request.student_id,
+                project_id=project_id,
+                role="model",
+                content=full_answer,
+            )
+
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+

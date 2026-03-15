@@ -64,6 +64,8 @@ async def get_setup_utils():
     )
     # attach cache to NLP controller if available
     nlp_controller.cache = cache_manager
+    # attach db to NLP controller for curriculum filtering
+    nlp_controller.db = db_client
 
     return (
         mongo_conn,
