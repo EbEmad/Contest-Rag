@@ -13,19 +13,19 @@ nlp_router = APIRouter(
     tags=["api_v1", "nlp"],
 )
 
-@nlp_router.post("/index/push/{project_id}")
-async def index_project(request: Request, project_id: str, push_request: PushRequest):
+# @nlp_router.post("/index/push/{project_id}")
+# async def index_project(request: Request, project_id: str, push_request: PushRequest):
 
-    task=index_data_content.delay(
-        project_id=project_id,
-        do_reset=push_request.do_reset
-    )
-    return JSONResponse(
-        content={
-            "signal":ResponseSignal.DATA_PUSH_TASK_READY.value,
-            "task_id":task.id
-        }
-    )
+#     task=index_data_content.delay(
+#         project_id=project_id,
+#         do_reset=push_request.do_reset
+#     )
+#     return JSONResponse(
+#         content={
+#             "signal":ResponseSignal.DATA_PUSH_TASK_READY.value,
+#             "task_id":task.id
+#         }
+#     )
 
 @nlp_router.get("/index/info/{project_id}")
 async def get_project_index_info(request: Request, project_id: str):

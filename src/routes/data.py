@@ -9,7 +9,7 @@ import logging
 from .schemes.data import ProcessRequest
 from models.db_schemes import  Asset
 from models.enums.AssetTypeEnum import AssetTypeEnum
-from tasks.file_processing import process_project_files
+# from tasks.file_processing import process_project_files
 from tasks.process_workflow import process_and_push_workflow
 logger = logging.getLogger('uvicorn.error')
 
@@ -81,45 +81,45 @@ async def upload_data(request: Request, project_id: str, file: UploadFile,
             }
         )
 
-@data_router.post("/process/{project_id}")
-async def process_endpoint(request: Request, project_id: str, process_request: ProcessRequest):
-    """
-    Process uploaded files and optionally tag with curriculum metadata.
+# @data_router.post("/process/{project_id}")
+# async def process_endpoint(request: Request, project_id: str, process_request: ProcessRequest):
+#     """
+#     Process uploaded files and optionally tag with curriculum metadata.
     
-    If curriculum metadata (grade, subject) is provided,
-    chunks will be tagged for curriculum-aware RAG filtering.
-    """
+#     If curriculum metadata (grade, subject) is provided,
+#     chunks will be tagged for curriculum-aware RAG filtering.
+#     """
     
-    chunk_size = process_request.chunk_size
-    overlap_size = process_request.overlap_size
-    do_reset = process_request.do_reset
+#     chunk_size = process_request.chunk_size
+#     overlap_size = process_request.overlap_size
+#     do_reset = process_request.do_reset
     
-    # Build curriculum metadata dict (only if provided)
-    curriculum_metadata = None
-    if process_request.grade is not None:
-        curriculum_metadata = {
-            "grade": process_request.grade,
-            "subject": process_request.subject,
-            "chapter_name": process_request.chapter_name,
-            "topic_names": process_request.topic_names
-        }
+#     # Build curriculum metadata dict (only if provided)
+#     curriculum_metadata = None
+#     if process_request.grade is not None:
+#         curriculum_metadata = {
+#             "grade": process_request.grade,
+#             "subject": process_request.subject,
+#             "chapter_name": process_request.chapter_name,
+#             "topic_names": process_request.topic_names
+#         }
 
-    task=process_project_files.delay(
-        project_id=project_id,
-        file_id=process_request.file_id,
-        chunk_size=chunk_size,
-        overlap_size=overlap_size,
-        do_reset=do_reset,
-        curriculum_metadata=curriculum_metadata  # ← Pass curriculum metadata
-    )
+#     task=process_project_files.delay(
+#         project_id=project_id,
+#         file_id=process_request.file_id,
+#         chunk_size=chunk_size,
+#         overlap_size=overlap_size,
+#         do_reset=do_reset,
+#         curriculum_metadata=curriculum_metadata  # ← Pass curriculum metadata
+#     )
 
-    return JSONResponse(
-        content={
-            "signal": ResponseSignal.PROCESSING_SUCCESS.value,
-            "task_id": task.id,
-            "curriculum_metadata": curriculum_metadata  # Return what was set
-        }
-    )
+#     return JSONResponse(
+#         content={
+#             "signal": ResponseSignal.PROCESSING_SUCCESS.value,
+#             "task_id": task.id,
+#             "curriculum_metadata": curriculum_metadata  # Return what was set
+#         }
+#     )
 
 
 
