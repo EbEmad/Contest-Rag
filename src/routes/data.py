@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, Depends, UploadFile, status, Request
+from fastapi import APIRouter, Depends, UploadFile, status, Request
 from fastapi.responses import JSONResponse
 import os
 from helpers.config import get_settings, Settings
@@ -7,10 +7,10 @@ import aiofiles
 from models import ResponseSignal
 import logging
 from .schemes.data import ProcessRequest
-from models.db_schemes import  Asset
+from models.db_schemes import Asset
 from models.enums.AssetTypeEnum import AssetTypeEnum
-# from tasks.file_processing import process_project_files
 from tasks.process_workflow import process_and_push_workflow
+
 logger = logging.getLogger('uvicorn.error')
 
 data_router = APIRouter(
@@ -21,9 +21,8 @@ data_router = APIRouter(
 @data_router.post("/upload/{project_id}")
 async def upload_data(request: Request, project_id: str, file: UploadFile,
                       app_settings: Settings = Depends(get_settings)):
-        
     
-    project_model=request.app.project_model
+    project_model = request.app.project_model
 
     project = await project_model.get_project_or_create_one(
         project_id=project_id
@@ -62,8 +61,7 @@ async def upload_data(request: Request, project_id: str, file: UploadFile,
             }
         )
 
-
-    asset_model=request.app.asset_model
+    asset_model = request.app.asset_model
 
     asset_resource = Asset(
         asset_project_id=project.id,
@@ -80,48 +78,6 @@ async def upload_data(request: Request, project_id: str, file: UploadFile,
                 "file_id": str(asset_record.id),
             }
         )
-
-# @data_router.post("/process/{project_id}")
-# async def process_endpoint(request: Request, project_id: str, process_request: ProcessRequest):
-#     """
-#     Process uploaded files and optionally tag with curriculum metadata.
-    
-#     If curriculum metadata (grade, subject) is provided,
-#     chunks will be tagged for curriculum-aware RAG filtering.
-#     """
-    
-#     chunk_size = process_request.chunk_size
-#     overlap_size = process_request.overlap_size
-#     do_reset = process_request.do_reset
-    
-#     # Build curriculum metadata dict (only if provided)
-#     curriculum_metadata = None
-#     if process_request.grade is not None:
-#         curriculum_metadata = {
-#             "grade": process_request.grade,
-#             "subject": process_request.subject,
-#             "chapter_name": process_request.chapter_name,
-#             "topic_names": process_request.topic_names
-#         }
-
-#     task=process_project_files.delay(
-#         project_id=project_id,
-#         file_id=process_request.file_id,
-#         chunk_size=chunk_size,
-#         overlap_size=overlap_size,
-#         do_reset=do_reset,
-#         curriculum_metadata=curriculum_metadata  # ← Pass curriculum metadata
-#     )
-
-#     return JSONResponse(
-#         content={
-#             "signal": ResponseSignal.PROCESSING_SUCCESS.value,
-#             "task_id": task.id,
-#             "curriculum_metadata": curriculum_metadata  # Return what was set
-#         }
-#     )
-
-
 
 
 @data_router.post("/process_and_push/{project_id}")
@@ -144,13 +100,13 @@ async def process_and_push_endpoint(request: Request, project_id: str, process_r
             "topic_names": process_request.topic_names
         }
 
-    workflow_task=process_and_push_workflow.delay(
+    workflow_task = process_and_push_workflow.delay(
         project_id=project_id,
         file_id=process_request.file_id,
         chunk_size=chunk_size,
         overlap_size=overlap_size,
         do_reset=do_reset,
-        curriculum_metadata=curriculum_metadata  # ← Pass curriculum metadata
+        curriculum_metadata=curriculum_metadata
     )
 
     return JSONResponse(
@@ -160,6 +116,3 @@ async def process_and_push_endpoint(request: Request, project_id: str, process_r
             "curriculum_metadata": curriculum_metadata
         }
     )
-
-
-    

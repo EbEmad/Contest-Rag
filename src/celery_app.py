@@ -17,7 +17,7 @@ async def get_setup_utils():
     mongo_conn = AsyncIOMotorClient(settings.MONGODB_URL)
     db_client = mongo_conn[settings.MONGODB_DATABASE]
 
-    # Redis cache manager (connect on startup)
+   
     cache_manager = CacheManager(
         redis_url=settings.REDIS_URL,
         ttl=getattr(settings, "CACHE_TTL", 3600),
@@ -26,25 +26,25 @@ async def get_setup_utils():
     llm_provider_factory = LLMProviderFactory(settings)
     vectordb_provider_factory = VectorDBProviderFactory(settings)
     
-    # create project model instance
+    
     project_model=await  ProjectModel.create_instance(db_client=db_client)
 
-    # create chunk model instance
+  
     chunk_model=await ChunkModel.create_instance(db_client=db_client)
     
-    # create asset model instance
+    
     asset_model= await AssetModel.create_instance(db_client=db_client)
 
-    # generation client
+    
     generation_client = llm_provider_factory.create(provider=settings.GENERATION_BACKEND)
     generation_client.set_generation_model(model_id = settings.GENERATION_MODEL_ID)
 
-    # embedding client
+   
     embedding_client = llm_provider_factory.create(provider=settings.EMBEDDING_BACKEND)
     embedding_client.set_embedding_model(model_id=settings.EMBEDDING_MODEL_ID,
                                              embedding_size=settings.EMBEDDING_MODEL_SIZE)
     
-    # vector db client
+   
     vectordb_client = vectordb_provider_factory.create(
         provider=settings.VECTOR_DB_BACKEND
     )
@@ -55,16 +55,16 @@ async def get_setup_utils():
         default_language=settings.DEFAULT_LANG,
     )
 
-    # create nlp controller
+   
     nlp_controller=NLPController(
         vectordb_client=vectordb_client,
         generation_client=generation_client,
         embedding_client=embedding_client,
         template_parser=template_parser,
     )
-    # attach cache to NLP controller if available
+   
     nlp_controller.cache = cache_manager
-    # attach db to NLP controller for curriculum filtering
+    
     nlp_controller.db = db_client
 
     return (

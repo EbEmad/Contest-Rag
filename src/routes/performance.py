@@ -2,7 +2,7 @@ import logging
 from fastapi import APIRouter, Request, status
 from fastapi.responses import JSONResponse
 
-from routes.schemes.performance import RoadmapRequest, TeacherDashboardRequest
+from routes.schemes.performance import RoadmapRequest
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -12,40 +12,11 @@ performance_router = APIRouter(
 )
 
 
-@performance_router.get("/student/{student_id}")
-async def student_dashboard(request: Request, student_id: str):
-    """
-    Student dashboard: overall accuracy, weak and strong topics, all topic details.
-    """
-    performance_controller = request.app.performance_controller
-    dashboard = await performance_controller.get_student_dashboard(student_id)
-    return JSONResponse(content={"signal": "STUDENT_DASHBOARD_RETRIEVED", **dashboard})
-
-
-@performance_router.get("/parent/{student_id}")
-async def parent_dashboard(request: Request, student_id: str):
-    """
-    Parent-facing summary: overall status message, topics mastered vs needing attention.
-    """
-    performance_controller = request.app.performance_controller
-    dashboard = await performance_controller.get_parent_dashboard(student_id)
-    return JSONResponse(content={"signal": "PARENT_DASHBOARD_RETRIEVED", **dashboard})
-
-
-@performance_router.post("/teacher")
-async def teacher_dashboard(request: Request, teacher_request: TeacherDashboardRequest):
-    """
-    Teacher dashboard: per-topic class averages, struggling students count, flagged weak topics.
-    """
-    performance_controller = request.app.performance_controller
-    dashboard = await performance_controller.get_teacher_dashboard(teacher_request.topic_ids)
-    return JSONResponse(content={"signal": "TEACHER_DASHBOARD_RETRIEVED", **dashboard})
-
-
 @performance_router.post("/roadmap")
 async def generate_roadmap(request: Request, roadmap_request: RoadmapRequest):
     """
-    Generate a personalized 2-week LLM study roadmap for a student based on weak topics.
+    Generate a personalized 2-week LLM study roadmap for a student.
+    All student data is provided by the calling backend.
     """
     performance_controller = request.app.performance_controller
     roadmap = await performance_controller.generate_roadmap(
@@ -54,7 +25,6 @@ async def generate_roadmap(request: Request, roadmap_request: RoadmapRequest):
         grade=roadmap_request.grade,
         student_level=roadmap_request.student_level,
         weak_topic_names=roadmap_request.weak_topic_names,
-        weak_topic_ids=roadmap_request.weak_topic_ids,
     )
 
     if not roadmap:
@@ -92,7 +62,7 @@ async def get_latest_roadmap(request: Request, student_id: str):
             "roadmap_id": str(roadmap.id),
             "student_id": student_id,
             "llm_explanation": roadmap.llm_explanation,
-            "weak_topic_ids": [str(tid) for tid in roadmap.weak_topic_ids],
+            "weak_topic_names": roadmap.weak_topic_names,
             "generated_at": str(roadmap.generated_at),
         }
     )

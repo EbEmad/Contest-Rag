@@ -25,28 +25,20 @@ async def generate_quiz(request: Request, quiz_request: QuizGenerateRequest):
     quiz_controller = request.app.quiz_controller
     project_model = request.app.project_model
 
-    # Validate IDs are valid ObjectIds (24-char hex)
     if not ObjectId.is_valid(quiz_request.topic_id):
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={
                 "signal": "INVALID_ID",
-                "detail": f"topic_id '{quiz_request.topic_id}' is not a valid ObjectId. Use a 24-char hex ID."
+                "detail": f"topic_id '{quiz_request.topic_id}' is not a valid ObjectId."
             },
         )
-    
-    if not ObjectId.is_valid(quiz_request.student_id):
-        # If student_id is e.g. 'physics_101', we can't use it as an ObjectId in QuizAttempt.
-        # We should probably use the student's actual MongoDB _id.
-        # For now, let's just warn or block if it's meant to be an ID.
-        pass
 
-    # Use the student's project (each project = one corpus)
     project = await project_model.get_project_or_create_one(
         project_id=quiz_request.student_id
     )
 
-    # Retrieve context documents via existing RAG pipeline
+    # Retrieve context documents via RAG pipeline
     context_docs = await nlp_controller.search_by_curriculum(
         project=project,
         query=quiz_request.topic_name,
@@ -61,22 +53,14 @@ async def generate_quiz(request: Request, quiz_request: QuizGenerateRequest):
             content={"signal": "NO_CONTEXT_FOUND", "detail": "No relevant content found for this topic."},
         )
 
-    # Convert enum strings to enum values for controller
-    difficulty = DifficultyLevel(quiz_request.difficulty.value)
-    question_types = (
-        [QuestionType(qt.value) for qt in quiz_request.question_types]
-        if quiz_request.question_types
-        else None
-    )
-
     questions = await quiz_controller.generate_quiz(
         topic_id=quiz_request.topic_id,
         topic_name=quiz_request.topic_name,
         context_documents=context_docs,
         num_questions=quiz_request.num_questions,
-        difficulty=difficulty,
-        question_types=question_types,
-        student_level="BEGINNER",  # future: fetch from StudentProfile
+        difficulty=quiz_request.difficulty,
+        question_types=quiz_request.question_types,
+        student_level="BEGINNER",
     )
 
     if not questions:
@@ -85,10 +69,10 @@ async def generate_quiz(request: Request, quiz_request: QuizGenerateRequest):
             content={"signal": "QUIZ_GENERATION_FAILED"},
         )
 
-    # Create an attempt record (not yet submitted)
+    # Create an attempt record
     quiz_model = request.app.quiz_model
     attempt = QuizAttempt(
-        student_id=ObjectId(quiz_request.student_id) if len(quiz_request.student_id) == 24 else ObjectId(),
+        student_id=ObjectId(quiz_request.student_id) if ObjectId.is_valid(quiz_request.student_id) else ObjectId(),
         topic_id=ObjectId(quiz_request.topic_id),
         questions=[q.id for q in questions],
         max_score=float(len(questions)),
@@ -117,10 +101,8 @@ async def generate_quiz(request: Request, quiz_request: QuizGenerateRequest):
 async def submit_quiz(request: Request, attempt_id: str, submit_request: QuizSubmitRequest):
     """
     Submit answers for a quiz attempt. Returns score and per-question results.
-    Also updates TopicPerformance for the student.
     """
     quiz_controller = request.app.quiz_controller
-    performance_controller = request.app.performance_controller
 
     result = await quiz_controller.grade_quiz_attempt(
         attempt_id=attempt_id,
@@ -132,13 +114,6 @@ async def submit_quiz(request: Request, attempt_id: str, submit_request: QuizSub
             status_code=status.HTTP_404_NOT_FOUND,
             content={"signal": "ATTEMPT_NOT_FOUND"},
         )
-
-    # Update performance record
-    await performance_controller.update_after_attempt(
-        grade_result=result,
-        topic_id=submit_request.topic_id,
-        student_id=submit_request.student_id,
-    )
 
     return JSONResponse(content={"signal": "QUIZ_GRADED", **result})
 

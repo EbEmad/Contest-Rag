@@ -109,18 +109,18 @@ class IdempotencyManager:
         if not existing_task:
             return True, None
             
-        # Don't execute if task is already completed successfully
+        
         if existing_task.status == 'SUCCESS':
             return False, existing_task
             
-        # Check if task is stuck (running longer than time limit + 60 seconds)
+        
         if existing_task.status in ['PENDING', 'STARTED', 'RETRY']:
             if existing_task.started_at:
                 time_elapsed = (datetime.utcnow() - existing_task.started_at).total_seconds()
-                time_gap = 60  # 60 seconds grace period
+                time_gap = 60 
                 if time_elapsed > (task_time_limit + time_gap):
-                    return True, existing_task  # Task is stuck, allow re-execution
-            return False, existing_task  # Task is still running within time limit
+                    return True, existing_task  
+            return False, existing_task  
             
         # Re-execute if previous task failed
         return True, existing_task
