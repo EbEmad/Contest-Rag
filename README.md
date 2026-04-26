@@ -1,143 +1,216 @@
 # Contest-Rag
 
-A robust Retrieval-Augmented Generation (RAG) system built with FastAPI, MongoDB, and Qdrant. This application allows users to upload documents, automatically chunk and index them, and perform context-aware Q&A using advanced LLMs.
+An advanced AI-powered educational platform that leverages **Retrieval-Augmented Generation (RAG)** to provide personalized learning experiences. The system allows educators to upload curriculum materials, which are then used to power context-aware Q&A, automated quiz generation, and personalized student roadmaps.
 
-## Architecture
+## 🚀 Key Features
 
-The system follows a modern RAG pipeline, separating data ingestion from the retrieval-augmented generation flow.
+- **Robust RAG Engine**: High-fidelity semantic search using Qdrant and cross-encoder reranking.
+- **Automated Quiz Generation**: Dynamically creates quizzes from uploaded curriculum content, tailored to student difficulty levels.
+- **Personalized Roadmaps**: Automatically generates two-week study plans based on student performance data and identified weak topics.
+- **Curriculum Hierarchy**: Organizes content by Grade, Subject, Chapter, and Topic for precise contextual retrieval.
+- **Async Processing**: Leverages Celery for background document chunking and embedding to ensure a responsive API.
+- **Scalable Architecture**: Built with FastAPI, MongoDB, Qdrant, and Redis.
+
+## 🏗️ System Architecture
+
+The platform is designed as a modular ecosystem where specialized controllers interact with AI providers and multi-modal data stores.
+
+### High-Level Architecture
 ```mermaid
-graph LR
-    A[Doc Upload] -->|Processing & Chunking| B[(MongoDB<br>Raw Data & Chunks)]
-    B -->|Embedding Model| C[(Qdrant<br>Vector Store)]
-    
-    subgraph "RAG Flow"
-        User[User Query] -->|API Request| App[FastAPI]
-        App -->|Vector Search| C
-        C -->|Retrieved Context| App
-        App -->|"Context + Prompt"| LLM["LLM<br>(OpenAI / Gemini)"]
+graph TD
+    subgraph "Frontend Layer"
+        UI[Web/Mobile Client]
     end
 
-    App -->|Generated Answer| User
+    subgraph "API Gateway - FastAPI"
+        API[FastAPI Server]
+    end
 
-    classDef db fill:#249edc,stroke:#fff,stroke-width:2px,color:#fff
-    class B,C db
+    subgraph "Logic Layer (Controllers)"
+        NLPC["RAG Controller<br/>(NLPController)"]
+        QuizC["Quiz Controller"]
+        PerfC["Performance Controller"]
+        ProcC["Process Controller"]
+    end
+
+    subgraph "AI & Vector Layer"
+        GP[LLM Generation Provider]
+        EP[Embedding Provider]
+        VDB[(Qdrant Vector DB)]
+    end
+
+    subgraph "Data Storage"
+        MDB[(MongoDB)]
+        Redis[(Redis Cache)]
+    end
+
+    subgraph "Background Processing"
+        Broker[RabbitMQ/Redis Broker]
+        Celery[Celery Workers]
+    end
+
+    UI <--> API
+    API <--> NLPC
+    API <--> QuizC
+    API <--> PerfC
+
+    NLPC <--> EP
+    NLPC <--> GP
+    NLPC <--> VDB
+    NLPC <--> MDB
+
+    QuizC <--> GP
+    QuizC <--> NLPC
+    QuizC <--> MDB
+
+    PerfC <--> GP
+    PerfC <--> MDB
+
+    ProcC --> Broker --> Celery
+    Celery <--> MDB
+    Celery <--> EP
+    Celery <--> VDB
+
+    API <--> Redis
 ```
 
-## How It Works
+---
 
-Here is a short and simple explanation of each part of the project:
+## 🔄 Core Data Flows
 
-### 1. The Web Server (FastAPI)
-Think of this as the front desk. It receives your requests (like "upload this file" or "answer this question") and directs them to the right department.
+### 1. Document Ingestion (Async Pipeline)
+This flow handles the transition from raw PDF documents to a searchable vector index.
 
-### 2. The Database (MongoDB)
-This is the filing cabinet. It stores your uploaded files and keeps track of all the small text pieces (chunks) we make from them.
+```mermaid
+sequenceDiagram
+    participant User
+    participant API as FastAPI (Data Route)
+    participant DB as MongoDB
+    participant Broker as RabbitMQ/Redis
+    participant Celery as Celery Worker
+    participant EP as Embedding Provider
+    participant VDB as Qdrant Vector DB
 
-### 3. The Vector Store (Qdrant)
-This is the smart index. It doesn't just store words; it stores the *meaning* of the text as numbers (vectors). This allows the system to find relevant information even if the exact keywords don't match.
+    User->>API: Upload PDF/Doc
+    API->>DB: Save Asset Metadata
+    API->>Broker: Dispatch 'process_document' task
+    API-->>User: Return task_id (Processing...)
 
-### 4. The Brains (LLM)
-This is the intelligent part (like OpenAI or Gemini). It reads the relevant information found by Qdrant and writes a clear answer to your question.
+    Broker->>Celery: Pickup task
+    Celery->>Celery: Chunking Document
+    loop for each chunk
+        Celery->>EP: Get embeddings
+        EP-->>Celery: Vector
+        Celery->>VDB: Upsert Vector + Metadata
+        Celery->>DB: Save Chunk details
+    end
+    Celery->>DB: Update Asset status to 'COMPLETED'
+```
 
-### 5. The Workflow
-1.  **Ingestion**: You upload a PDF. We chop it into small pieces (chunks) and save them to MongoDB.
-2.  **Indexing**: We turn those chunks into "vectors" (meaning-numbers) and save them in Qdrant.
-3.  **Search**: You ask a question. We turn your question into a vector and find the most similar chunks in Qdrant.
-4.  **Answer**: We give those chunks to the LLM and say "Answer this question using these notes."
+### 2. Automated Roadmap Generation
+Uses student performance history to identify weak areas and generate a custom learning plan via LLM.
 
-## Tech Stack
+```mermaid
+sequenceDiagram
+    participant Student
+    participant API as Performance API
+    participant CTRL as Performance Controller
+    participant MDB as MongoDB (Students/Performance)
+    participant LLM as LLM Provider
 
--   **Backend Framework**: [FastAPI](https://fastapi.tiangolo.com/) - High-performance async web framework.
--   **Database**:
-    -   [MongoDB](https://www.mongodb.com/) (via [Motor](https://motor.readthedocs.io/)) - Stores raw document assets and metadata.
-    -   [Qdrant](https://qdrant.tech/) - Vector database for efficient semantic search.
--   **AI & LLM**:
-    -   [LangChain](https://www.langchain.com/) - Orchestration framework.
-    -   **LLMs**: Supports OpenAI, Gemini, and Cohere.
--   **Processing**:
-    -   [PyMuPDF](https://pymupdf.readthedocs.io/) - efficient PDF processing.
+    Student->>API: POST /roadmap (student_id)
+    API->>CTRL: generate_roadmap(student_id)
+    CTRL->>MDB: Fetch student profile (Grade, Level)
+    CTRL->>MDB: Fetch weak topics (Score < 60%)
+    CTRL->>LLM: Prompt(Student Profile + Weak Topics)
+    LLM-->>CTRL: Personalized Study Plan (Markdown)
+    CTRL->>MDB: Save Roadmap
+    CTRL-->>Student: Return Roadmap JSON
+```
 
-## Key Features
+### 3. Quiz Generation (RAG-Driven)
+How the system ensures quizzes are factually grounded in the uploaded curriculum.
 
--   **Document Ingestion**: Upload PDF documents via REST API.
--   **Automatic Indexing**: Documents are automatically processed, chunked, and embedded into the vector store.
--   **Context-Aware QA**: Ask questions about your documents and receive answers grounded in the uploaded content.
--   **Hybrid Storage**: Combines MongoDB for document management with Qdrant for vector search.
+```mermaid
+sequenceDiagram
+    participant Student
+    participant API as Quiz API
+    participant CTRL as Quiz Controller
+    participant NLP as NLP Controller (RAG)
+    participant LLM as LLM Provider
 
-## Getting Started
+    Student->>API: GET /generate-quiz (topic_id)
+    API->>CTRL: Start Generation
+    CTRL->>NLP: Retrieve context for topic_id
+    NLP-->>CTRL: Curriculum Chunks
+    CTRL->>LLM: Prompt(Chunks + Target Difficulty)
+    LLM-->>CTRL: Generated Quiz (JSON)
+    CTRL-->>Student: Return Quiz Questions
+```
 
-1.  **Clone the repository**:
-    ```bash
-    git clone <repository_url>
-    cd Contest-Rag
-    ```
+---
 
-2.  **Set up environment variables**:
-    Copy `.env.example` to `.env` and configure your API keys (OpenAI/Gemini) and database credentials.
+## 📁 Project Structure
 
-3.  **Run with Docker**:
-    ```bash
-    docker-compose up -d
-    ```
+```text
+/
+├── src/
+│   ├── AI/              # LLM & Vector DB Providers
+│   ├── controllers/     # Business logic (NLP, Quiz, Performance)
+│   ├── models/          # MongoDB Schemas & DB Logic
+│   ├── routes/          # FastAPI Route Definitions
+│   ├── tasks/           # Celery Background Tasks
+│   ├── main.py          # App Entry Point
+│   └── celery_app.py    # Celery Configuration
+├── Docker/              # Dockerfiles for services
+├── docker-compose.yml   # Multi-container setup
+└── pyproject.toml       # Dependencies (Managed by uv/pip)
+```
 
-4.  **Access the API**:
-    Navigate to `http://localhost:8000/docs` to view the interactive API documentation.
+---
 
-## API Usage
+## 🛠️ Setup & Installation
 
-Here are the essential `curl` commands to interact with the API.
+### Environment Configuration
+1. Copy the example environment file:
+   ```bash
+   cp src/.env.example src/.env
+   ```
+2. Fill in your API keys and configuration (OpenAI, Gemini, Qdrant, MongoDB, etc.).
 
-### 1. Check Health
+### Running with Docker (Recommended)
+The project is containerized for easy deployment:
 ```bash
-curl -X GET "http://localhost:8000/api/v1/"
+docker-compose up --build
+```
+This will spin up:
+- **FastAPI App**: Port 8000
+- **MongoDB**: Primary Store
+- **Qdrant**: Vector Search Engine
+- **Redis**: Caching & Background Task Result Backend
+- **RabbitMQ**: (Optional if used as Celery Broker)
+
+### Local Development
+Ensure you have Python 3.10+ and `uv` installed:
+```bash
+# Install dependencies
+uv sync
+
+# Run the API
+uv run fastapi dev src/main.py
+
+# Run Celery Worker
+uv run celery -A src.celery_app worker --loglevel=info
 ```
 
-### 2. Upload Document
-Upload a PDF file to the system.
-```bash
-curl -X POST "http://localhost:8000/api/v1/data/upload/my_project" \
-     -H "Content-Type: multipart/form-data" \
-     -F "file=@/path/to/your/document.pdf"
-```
+## 🔐 API Documentation
+Once the server is running, visit:
+- **Swagger Docs**: `http://localhost:8000/docs`
+- **ReDoc**: `http://localhost:8000/redoc`
 
-### 3. Process Document
-Chunk the uploaded document.
-```bash
-curl -X POST "http://localhost:8000/api/v1/data/process/my_project" \
-     -H "Content-Type: application/json" \
-     -d '{
-           "chunk_size": 100,
-           "overlap_size": 20,
-           "do_reset": 0
-         }'
-```
+### Principal Routes:
+- `/api/v1/nlp`: RAG search and Q&A.
+- `/api/v1/quiz`: Quiz generation and management.
+- `/api/v1/performance`: Analytics and personalized roadmaps.
+- `/api/v1/data`: Document upload and processing status.
 
-### 4. Index Data
-Push processed chunks to Qdrant vector store.
-```bash
-curl -X POST "http://localhost:8000/api/v1/nlp/index/push/my_project" \
-     -H "Content-Type: application/json" \
-     -d '{"do_reset": 0}'
-```
-
-### 5. Search Index
-Semantic search for relevant context.
-```bash
-curl -X POST "http://localhost:8000/api/v1/nlp/index/search/my_project" \
-     -H "Content-Type: application/json" \
-     -d '{
-           "text": "What is the summary of the document?",
-           "limit": 5
-         }'
-```
-
-### 6. RAG Answer
-Ask a question and get an AI-generated answer.
-```bash
-curl -X POST "http://localhost:8000/api/v1/nlp/index/answer/my_project" \
-     -H "Content-Type: application/json" \
-     -d '{
-           "text": "Explain the key findings.",
-           "limit": 5
-         }'
-```

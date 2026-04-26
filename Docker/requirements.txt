@@ -12,3 +12,16 @@ openai==1.75.0
 cohere==5.5.8
 qdrant-client==1.10.1
 google-genai
+langchain-experimental
+sentence-transformers
+langchain-openai
+langchain-community
+langchain-text-splitters
+# Task Queue and Background Processing
+celery==5.5.3
+redis==6.2.0
+kombu==5.5.4
+billiard==4.2.1
+vine==5.1.0
+flower==2.0.1
+aioboto3

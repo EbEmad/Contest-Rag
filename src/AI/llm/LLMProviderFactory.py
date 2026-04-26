@@ -1,6 +1,17 @@
-
 from .LLMEnums import LLMEnums
-from .providers import OpenAIProvider, CoHereProvider,GeminiProvider
+from .providers import OpenAIProvider, CoHereProvider, GeminiProvider
+import asyncio
+
+class LangChainEmbeddingWrapper:
+    """Bridges our async LLM providers with LangChain's sync-based Embedding interface."""
+    def __init__(self, provider_instance):
+        self.provider = provider_instance
+
+    def embed_documents(self, texts):
+        return asyncio.run(self.provider.embed_texts_batch(texts))
+
+    def embed_query(self, text):
+        return asyncio.run(self.provider.embed_text(text))
 
 class LLMProviderFactory:
     def __init__(self, config: dict):
@@ -33,5 +44,17 @@ class LLMProviderFactory:
                 default_generation_temperature=self.config.GENERATION_DAFAULT_TEMPERATURE
             )
 
-
         return None
+
+    def create_embeddings(self, provider: str = None, model_id: str = None):
+        """Create a LangChain-compatible embedding object based on provided or default settings."""
+        target_provider = provider or self.config.EMBEDDING_BACKEND
+        instance = self.create(target_provider)
+        if not instance:
+            return None
+        
+        # Use provided model_id or configuration default
+        target_model = model_id or self.config.EMBEDDING_MODEL_ID
+        instance.set_embedding_model(target_model, self.config.EMBEDDING_MODEL_SIZE)
+        
+        return LangChainEmbeddingWrapper(instance)

@@ -1,9 +1,6 @@
-from fastapi import FastAPI, APIRouter, status, Request
+from fastapi import APIRouter, status, Request
 from fastapi.responses import JSONResponse
-from routes.schemes.nlp import PushRequest, SearchRequest
-from models.ProjectModel import ProjectModel
-from models.ChunkModel import ChunkModel
-from controllers import NLPController
+from routes.schemes.nlp import SearchRequest
 from models import ResponseSignal
 
 import logging
@@ -15,71 +12,41 @@ nlp_router = APIRouter(
     tags=["api_v1", "nlp"],
 )
 
-@nlp_router.post("/index/push/{project_id}")
-async def index_project(request: Request, project_id: str, push_request: PushRequest):
 
-    project_model = request.app.project_model
+async def _build_chat_history(nlp_controller, chat_message_model, student_id: str, project_id: str) -> list:
+    """Build chat history from stored messages for a student+project pair."""
+    if not student_id or not chat_message_model:
+        return []
 
-    chunk_model = request.app.chunk_model
-    project = await project_model.get_project_or_create_one(
-        project_id=project_id
+    past_messages = await chat_message_model.get_recent_messages(
+        student_id=student_id,
+        project_id=project_id,
+        limit=10,
     )
 
-    if not project:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={
-                "signal": ResponseSignal.PROJECT_NOT_FOUND_ERROR.value
-            }
-        )
-    
-    # nlp_controller = NLPController(
-    #     vectordb_client=request.app.vectordb_client,
-    #     generation_client=request.app.generation_client,
-    #     embedding_client=request.app.embedding_client,
-    #     template_parser=request.app.template_parser,
-    # )
-    nlp_controller = request.app.nlp_controller
-    has_records = True
-    page_no = 1
-    inserted_items_count = 0
-    idx = 0
+    chat_history = []
+    for msg in past_messages:
+        if msg.role in ("model", "assistant"):
+            role = nlp_controller.generation_client.enums.ASSISTANT.value
+        else:
+            role = nlp_controller.generation_client.enums.USER.value
+        formatted_msg = await nlp_controller.generation_client.construct_prompt(prompt=msg.content, role=role)
+        chat_history.append(formatted_msg)
 
-    while has_records:
-        page_chunks = await chunk_model.get_poject_chunks(project_id=project.id, page_no=page_no)
-        if len(page_chunks):
-            page_no += 1
-        
-        if not page_chunks or len(page_chunks) == 0:
-            has_records = False
-            break
+    return chat_history
 
-        chunks_ids =  list(range(idx, idx + len(page_chunks)))
-        idx += len(page_chunks)
-        
-        is_inserted = await nlp_controller.index_into_vector_db(
-            project=project,
-            chunks=page_chunks,
-            do_reset=push_request.do_reset,
-            chunks_ids=chunks_ids
-        )
 
-        if not is_inserted:
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content={
-                    "signal": ResponseSignal.INSERT_INTO_VECTORDB_ERROR.value
-                }
-            )
-        
-        inserted_items_count += len(page_chunks)
-        
-    return JSONResponse(
-        content={
-            "signal": ResponseSignal.INSERT_INTO_VECTORDB_SUCCESS.value,
-            "inserted_items_count": inserted_items_count
-        }
+async def _persist_chat_turn(chat_message_model, student_id: str, project_id: str, question: str, answer: str):
+    """Save a user question + model answer to chat history."""
+    if not student_id or not chat_message_model:
+        return
+    await chat_message_model.add_message(
+        student_id=student_id, project_id=project_id, role="user", content=question,
     )
+    await chat_message_model.add_message(
+        student_id=student_id, project_id=project_id, role="model", content=answer,
+    )
+
 
 @nlp_router.get("/index/info/{project_id}")
 async def get_project_index_info(request: Request, project_id: str):
@@ -89,13 +56,6 @@ async def get_project_index_info(request: Request, project_id: str):
     project = await project_model.get_project_or_create_one(
         project_id=project_id
     )
-
-    # nlp_controller = NLPController(
-    #     vectordb_client=request.app.vectordb_client,
-    #     generation_client=request.app.generation_client,
-    #     embedding_client=request.app.embedding_client,
-    #     template_parser=request.app.template_parser,
-    # )
 
     nlp_controller = request.app.nlp_controller
 
@@ -117,17 +77,14 @@ async def search_index(request: Request, project_id: str, search_request: Search
         project_id=project_id
     )
 
-    # nlp_controller = NLPController(
-    #     vectordb_client=request.app.vectordb_client,
-    #     generation_client=request.app.generation_client,
-    #     embedding_client=request.app.embedding_client,
-    #     template_parser=request.app.template_parser,
-    # )
-
     nlp_controller = request.app.nlp_controller
 
-    results = await nlp_controller.search_vector_db_collection(
-        project=project, text=search_request.text, limit=search_request.limit
+    results = await nlp_controller.search_by_curriculum(
+        project=project,
+        query=search_request.text,
+        grade=search_request.grade,
+        subject=search_request.subject,
+        limit=search_request.limit
     )
 
     if not results:
@@ -149,22 +106,22 @@ async def search_index(request: Request, project_id: str, search_request: Search
 async def answer_rag(request: Request, project_id: str, search_request: SearchRequest):
     
     project_model = request.app.project_model
+    project = await project_model.get_project_or_create_one(project_id=project_id)
+    nlp_controller = request.app.nlp_controller
+    chat_message_model = getattr(request.app, "chat_message_model", None)
 
-    project = await project_model.get_project_or_create_one(
-        project_id=project_id
+    chat_history = await _build_chat_history(
+        nlp_controller, chat_message_model,
+        search_request.student_id, project_id,
     )
 
-    # nlp_controller = NLPController(
-    #     vectordb_client=request.app.vectordb_client,
-    #     generation_client=request.app.generation_client,
-    #     embedding_client=request.app.embedding_client,
-    #     template_parser=request.app.template_parser,
-    # )
-    nlp_controller = request.app.nlp_controller
-    answer, full_prompt, chat_history = await nlp_controller.answer_rag_question(
+    answer, full_prompt, _ = await nlp_controller.answer_rag_question(
         project=project,
         query=search_request.text,
         limit=search_request.limit,
+        grade=search_request.grade,
+        subject=search_request.subject,
+        chat_history=chat_history,
     )
 
     if not answer:
@@ -174,12 +131,54 @@ async def answer_rag(request: Request, project_id: str, search_request: SearchRe
                     "signal": ResponseSignal.RAG_ANSWER_ERROR.value
                 }
         )
-    
+
+    await _persist_chat_turn(
+        chat_message_model, search_request.student_id,
+        project_id, search_request.text, answer,
+    )
+
     return JSONResponse(
         content={
             "signal": ResponseSignal.RAG_ANSWER_SUCCESS.value,
             "answer": answer,
-            "full_prompt": full_prompt,
-            "chat_history": chat_history
         }
     )
+
+@nlp_router.post("/index/answer_stream/{project_id}")
+async def answer_rag_stream(request: Request, project_id: str, search_request: SearchRequest):
+    from fastapi.responses import StreamingResponse
+    
+    project_model = request.app.project_model
+    project = await project_model.get_project_or_create_one(project_id=project_id)
+    nlp_controller = request.app.nlp_controller
+    chat_message_model = getattr(request.app, "chat_message_model", None)
+
+    chat_history = await _build_chat_history(
+        nlp_controller, chat_message_model,
+        search_request.student_id, project_id,
+    )
+
+    async def event_generator():
+        full_answer_parts = []
+        async for chunk in nlp_controller.answer_rag_question_stream(
+            project=project,
+            query=search_request.text,
+            limit=search_request.limit,
+            grade=search_request.grade,
+            subject=search_request.subject,
+            chat_history=chat_history,
+        ):
+            if await request.is_disconnected():
+                break
+            full_answer_parts.append(chunk)
+            formatted_chunk = chunk.replace("\n", "\ndata: ")
+            yield f"data: {formatted_chunk}\n\n"
+
+        if full_answer_parts:
+            full_answer = "".join(full_answer_parts)
+            await _persist_chat_turn(
+                chat_message_model, search_request.student_id,
+                project_id, search_request.text, full_answer,
+            )
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")

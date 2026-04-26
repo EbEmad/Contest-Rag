@@ -2,7 +2,10 @@ from .BaseDataModel import BaseDataModel
 from .db_schemes import Asset
 from .enums.DataBaseEnum import DataBaseEnum
 from bson import ObjectId
+import logging
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 class AssetModel(BaseDataModel):
 
     def __init__(self, db_client: object):
@@ -26,6 +29,7 @@ class AssetModel(BaseDataModel):
                     name=index["name"],
                     unique=index["unique"]
                 )
+        
 
     async def create_asset(self, asset: Asset):
 
@@ -56,6 +60,12 @@ class AssetModel(BaseDataModel):
         if record:
             return Asset(**record)
         
+        return None
+
+    async def get_asset_by_id(self, asset_id: str):
+        record = await self.collection.find_one({"_id": ObjectId(asset_id)})
+        if record:
+            return Asset(**record)
         return None
 
 

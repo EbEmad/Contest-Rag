@@ -1,6 +1,8 @@
-from fastapi import FastAPI, APIRouter, Depends
-import os
+import logging
+from fastapi import APIRouter, Depends
 from helpers.config import get_settings, Settings
+
+logger = logging.getLogger("uvicorn.error")
 
 base_router = APIRouter(
     prefix="/api/v1",

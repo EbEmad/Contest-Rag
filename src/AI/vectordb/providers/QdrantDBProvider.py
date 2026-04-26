@@ -7,10 +7,11 @@ from models.db_schemes import RetrievedDocument
 
 class QdrantDBProvider(VectorDBInterface):
 
-    def __init__(self, db_path: str, distance_method: str):
+    def __init__(self, db_path: str, distance_method: str, url: str = None):
 
         self.client = None
         self.db_path = db_path
+        self.url = url
         self.distance_method = None
 
         if distance_method == DistanceMethodEnums.COSINE.value:
@@ -21,7 +22,10 @@ class QdrantDBProvider(VectorDBInterface):
         self.logger = logging.getLogger(__name__)
 
     def connect(self):
-        self.client = QdrantClient(path=self.db_path)
+        if self.url:
+            self.client = QdrantClient(url=self.url)
+        else:
+            self.client = QdrantClient(path=self.db_path)
 
     def disconnect(self):
         self.client = None
@@ -88,7 +92,12 @@ class QdrantDBProvider(VectorDBInterface):
     def insert_many(self, collection_name: str, texts: list, 
                           vectors: list, metadata: list = None, 
                           record_ids: list = None, batch_size: int = 50):
-        
+        if vectors is None or len(vectors) != len(texts):
+            self.logger.error(
+                f"insert_many: vectors length ({len(vectors) if vectors else 0}) must match texts length ({len(texts)})."
+            )
+            return False
+
         if metadata is None:
             metadata = [None] * len(texts)
 
@@ -145,4 +154,35 @@ class QdrantDBProvider(VectorDBInterface):
                 "text": result.payload["text"],
             })
             for result in results
+        ]
+    def hybrid_search(self, collection_name: str, vector: list, query_text: str, limit: int = 5):
+        """Combine vector similarity with keyword matching."""
+        from qdrant_client.models import Filter, FieldCondition, MatchText
+        
+        # Perform vector search with text filter
+        results = self.client.search(
+            collection_name=collection_name,
+            query_vector=vector,
+            query_filter=Filter(
+                should=[
+                    FieldCondition(
+                        key="text",
+                        match=MatchText(text=query_text)
+                    )
+                ]
+            ),
+            limit=limit * 2,  # Get more results for reranking
+        )
+        
+        if not results:
+            # Fallback to pure vector search
+            return self.search_by_vector(collection_name, vector, limit)
+        
+        # Return top results
+        return [
+            RetrievedDocument(**{
+                "score": result.score,
+                "text": result.payload["text"],
+            })
+            for result in results[:limit]
         ]
